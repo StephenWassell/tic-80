@@ -57,7 +57,7 @@
   (local h 136)
 
   (tset drawers id { :z 0 :f (fn []
-    (cls 1)) } )
+    (cls 5)) } )
 
   (tset collides id (fn [test-x test-y test-w test-h]
     (or
@@ -66,22 +66,51 @@
       (> (+ test-x test-w) w)
       (> (+ test-y test-h) h)))))
 
+(fn buttons []
+  [
+    (if (btn 0) 1 0)
+    (if (btn 1) 1 0)
+    (if (btn 2) 1 0)
+    (if (btn 3) 1 0)
+  ])
+
 (fn new-player []
   "Create a new player object: respond to keys, draw on the foreground."
   (local id (unique-id))
   (var x 96)
   (var y 24)
+  (var dx 0)
+  (var dy 0)
   (local w 48)
   (local h 48)
 
+  (local friction .9)
+  (local accel .1)
+  (local accel-diag (* accel .707))
+
   (tset updaters id (fn []
-    (var nx x)
-    (var ny y)
-    (when (btn 0) (set ny (- ny 1)))
-    (when (btn 1) (set ny (+ ny 1)))
-    (when (btn 2) (set nx (- nx 1)))
-    (when (btn 3) (set nx (+ nx 1)))
-    (when (no-collides nx ny w h) (set x nx) (set y ny))))
+    ; up down left right
+    (local action (match (buttons)
+      [1 0 0 0] { :ax 0 :ay (- 0 accel) }
+      [0 1 0 0] { :ax 0 :ay accel }
+      [0 0 1 0] { :ax (- 0 accel) :ay 0 }
+      [0 0 0 1] { :ax accel :ay 0 }
+      [1 0 1 0] { :ax (- 0 accel-diag) :ay (- 0 accel-diag) }
+      [1 0 0 1] { :ax accel-diag :ay (- 0 accel-diag) }
+      [0 1 1 0] { :ax (- 0 accel-diag) :ay accel-diag }
+      [0 1 0 1] { :ax accel-diag :ay accel-diag }
+      _ { :ax 0 :ay 0 }))
+
+    ; todo: mouse
+
+    (set dx (* friction (+ dx action.ax)))
+    (set dy (* friction (+ dy action.ay)))
+    
+    (local nx (+ x dx))
+    (local ny (+ y dy))
+    (if
+      (no-collides nx ny w h) (do (set x nx) (set y ny))
+      (do (set dx 0) (set dy 0)))))
 
   (tset drawers id { :z 1 :f (fn []
     (spr (+ 1 (* (// (% t 60) 30) 2))
