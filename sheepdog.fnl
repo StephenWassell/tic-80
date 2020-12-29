@@ -22,7 +22,7 @@
 
 (global TIC
   (fn tic []
-    "The main game loop."
+    "The main game loop. On each frame call all updaters then all drawers."
     (each [_ f (pairs updaters)] (f))
     ; todo: will this work? needs to be ipairs?
     (table.sort drawers #(< $1.z $2.z))
@@ -44,7 +44,7 @@
     (any-collides x y w h check-id iter-id))) ; Tail recursion
 
 ; Define function for constructors to call to get a new unique id.
-; It's closure returned by new-unique-id.
+; It's a closure returned by new-unique-id.
 (local unique-id ((fn []
   "Return a closure which increments id and returns the new value."
   (var id 0)
