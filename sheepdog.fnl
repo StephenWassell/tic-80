@@ -66,13 +66,46 @@
       (> (+ test-x test-w) w)
       (> (+ test-y test-h) h)))))
 
+(fn normalise [x y m]
+  "Normalise vector to a given magnitude."
+  (local scale (math.sqrt (+ (* x x) (* y y))))
+  ; avoid divide by 0
+  (if
+    (< scale 1) (values 0 0)
+    (values (* (/ x scale) m) (* (/ y scale) m))))
+
 (fn buttons []
+  "Array of 0/1 for: up down left right"
   [
     (if (btn 0) 1 0)
     (if (btn 1) 1 0)
     (if (btn 2) 1 0)
     (if (btn 3) 1 0)
   ])
+
+(fn to-mouse [x y]
+  "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
+  (local (mx my left middle right scrollx scrolly) (mouse))
+  (if
+    (or left middle right) (values (- mx x) (- my y))
+    (values 0 0)))
+
+(fn get-action [prev-x prev-y accel]
+  "Return x and y acceleration, given current coords and accel magnitude."
+  ; up down left right
+  (local (ax ay) (match (buttons)
+    [1 0 0 0] (values 0 -1)
+    [0 1 0 0] (values 0 1)
+    [0 0 1 0] (values -1 0)
+    [0 0 0 1] (values 1 0)
+    [1 0 1 0] (values -1 -1)
+    [1 0 0 1] (values 1 -1)
+    [0 1 1 0] (values -1 1)
+    [0 1 0 1] (values 1 1)
+    _ (to-mouse prev-x prev-y)))
+  (normalise ax ay accel))
+
+(fn center [x w] (+ x (/ w 2)))
 
 (fn new-player []
   "Create a new player object: respond to keys, draw on the foreground."
@@ -86,25 +119,12 @@
 
   (local friction .9)
   (local accel .1)
-  (local accel-diag (* accel .707))
 
   (tset updaters id (fn []
-    ; up down left right
-    (local action (match (buttons)
-      [1 0 0 0] { :ax 0 :ay (- 0 accel) }
-      [0 1 0 0] { :ax 0 :ay accel }
-      [0 0 1 0] { :ax (- 0 accel) :ay 0 }
-      [0 0 0 1] { :ax accel :ay 0 }
-      [1 0 1 0] { :ax (- 0 accel-diag) :ay (- 0 accel-diag) }
-      [1 0 0 1] { :ax accel-diag :ay (- 0 accel-diag) }
-      [0 1 1 0] { :ax (- 0 accel-diag) :ay accel-diag }
-      [0 1 0 1] { :ax accel-diag :ay accel-diag }
-      _ { :ax 0 :ay 0 }))
+    (local (ax ay) (get-action (center x w) (center y h) accel))
 
-    ; todo: mouse
-
-    (set dx (* friction (+ dx action.ax)))
-    (set dy (* friction (+ dy action.ay)))
+    (set dx (* friction (+ dx ax)))
+    (set dy (* friction (+ dy ay)))
     
     (local nx (+ x dx))
     (local ny (+ y dy))
