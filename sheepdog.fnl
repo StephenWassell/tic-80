@@ -3,6 +3,13 @@
 ;; desc:   short description
 ;; script: fennel
 
+; TIC-80 screen size.
+(local screen-w 240)
+(local screen-h 136)
+
+; Background of the map and transparent sprites - dark green.
+(local bg-colour 5)
+
 ; Incremented on each frame.
 (var t 0)
 
@@ -26,20 +33,15 @@
   "Calculate z-index from x and y coords. todo: is 0 fg or bg?"
   ((+ (* y 512) x)))
 
-(fn no-collides [x y w h prev]
-  "Return true if the provided coords don't collide with any other entity."
-  ; todo: don't check against itself
-  ; Get the first/next collide closure. The prev param is initially nil.
-  (local id (next collides prev))
+(fn any-collides [x y w h check-id prev-id]
+  "Return true if the provided coords collide with any other entity."
+  ; Get the first/next collide closure. The prev-id param is initially nil.
+  (local iter-id (next collides prev-id))
   (if
-    (= id nil) true ; Reached end of list, no collisions.
-    ((. collides id) x y w h) false ; A collide closure returned true.
-    (no-collides x y w h id))) ; Tail recursion
-
-  ;; (var ret true)
-  ;; (each [_ f (pairs collides)]
-  ;;   (when (f x y w h) (set ret false))) ; todo: break out of loop
-  ;; ret)
+    (= iter-id nil) false ; Reached end of list, no collisions.
+    (= iter-id check-id) (any-collides x y w h check-id iter-id) ; Don't collide with itself.
+    ((. collides iter-id) x y w h) true ; A collide closure returned true.
+    (any-collides x y w h check-id iter-id))) ; Tail recursion
 
 ; Define function for constructors to call to get a new unique id.
 ; It's closure returned by new-unique-id.
@@ -53,29 +55,26 @@
 (fn new-map []
   "Create a new map object: draw the background, check for screen edge collisions."
   (local id (unique-id))
-  (local w 240)
-  (local h 136)
 
   (tset drawers id { :z 0 :f (fn []
-    (cls 5)) } )
+    (cls bg-colour)) } )
 
   (tset collides id (fn [test-x test-y test-w test-h]
     (or
       (< test-x 0)
       (< test-y 0)
-      (> (+ test-x test-w) w)
-      (> (+ test-y test-h) h)))))
+      (> (+ test-x test-w -1) screen-w)
+      (> (+ test-y test-h -1) screen-h)))))
 
-(fn normalise [x y m]
+(fn normalise [x y mag]
   "Normalise vector to a given magnitude."
   (local scale (math.sqrt (+ (* x x) (* y y))))
-  ; avoid divide by 0
   (if
-    (< scale 1) (values 0 0)
-    (values (* (/ x scale) m) (* (/ y scale) m))))
+    (< scale 1) (values 0 0) ; Avoid divide by 0 and excessive wiggling.
+    (values (* (/ x scale) mag) (* (/ y scale) mag))))
 
 (fn buttons []
-  "Array of 0/1 for: up down left right"
+  "Array of 0/1 for buttons pressed: up down left right"
   [
     (if (btn 0) 1 0)
     (if (btn 1) 1 0)
@@ -83,15 +82,15 @@
     (if (btn 3) 1 0)
   ])
 
-(fn to-mouse [x y]
+(fn to-mouse [from-x from-y]
   "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
-  (local (mx my left middle right scrollx scrolly) (mouse))
+  (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
   (if
-    (or left middle right) (values (- mx x) (- my y))
+    (or left middle right) (values (- mouse-x from-x) (- mouse-y from-y))
     (values 0 0)))
 
-(fn get-action [prev-x prev-y accel]
-  "Return x and y acceleration, given current coords and accel magnitude."
+(fn get-action [from-x from-y accel]
+  "Return direction to move player based on buttons and mouse."
   ; up down left right
   (local (ax ay) (match (buttons)
     [1 0 0 0] (values 0 -1)
@@ -102,41 +101,59 @@
     [1 0 0 1] (values 1 -1)
     [0 1 1 0] (values -1 1)
     [0 1 0 1] (values 1 1)
-    _ (to-mouse prev-x prev-y)))
+    _ (to-mouse from-x from-y))) ; No buttons pressed, go towards mouse.
   (normalise ax ay accel))
 
-(fn center [x w] (+ x (/ w 2)))
+(fn center [x w]
+  "The center of a sprite given x and width (or y and height)."
+  (+ x (/ w 2)))
+
+(fn alternate [s]
+  "Alternate between s and s+1 for running feet and wagging tails."
+  (+ s (/ (% t 20) 10)))
+
+(fn moving [dx dy]
+  "True if we need the sprite for moving, given pixels per frame."
+  (or (> (math.abs dx) .1) (> (math.abs dy) .1)))
 
 (fn new-player []
   "Create a new player object: respond to keys, draw on the foreground."
   (local id (unique-id))
-  (var x 96)
-  (var y 24)
+  
+  ; Size of the dog. todo: shorter than this
+  (local w 8)
+  (local h 8)
+
+  ; Current location, updated in drawer.
+  (var x (/ (- screen-w w) 2))
+  (var y (/ (- screen-h h) 2))
+
+  ; Current velocity in pixels per frame, updated in updater.
   (var dx 0)
   (var dy 0)
-  (local w 48)
-  (local h 48)
 
+  ; How fast can it run.
+  (local accel .15)
   (local friction .9)
-  (local accel .1)
+
+  ; Sprite indices, also +1 to each for alternate.
+  (local spr-run 272)
+  (local spr-idle 274)
 
   (tset updaters id (fn []
+    "Update dx dy based on buttons and mouse."
     (local (ax ay) (get-action (center x w) (center y h) accel))
-
     (set dx (* friction (+ dx ax)))
     (set dy (* friction (+ dy ay)))
-    
-    (local nx (+ x dx))
-    (local ny (+ y dy))
-    (if
-      (no-collides nx ny w h) (do (set x nx) (set y ny))
-      (do (set dx 0) (set dy 0)))))
+    (when (any-collides (+ x dx) (+ y dy) w h id) (set dx 0) (set dy 0))))
 
   (tset drawers id { :z 1 :f (fn []
-    (spr (+ 1 (* (// (% t 60) 30) 2))
-         x y 14 3 0 0 2 2)
-    ; (print (.. "x=" x " y=" y " t=" (// t 60)) 84 84))
-    ) } ))
+    "Update x y from dx dy and draw the sprite there."
+    (set x (+ x dx))
+    (set y (+ y dy))
+    (local s (if (moving dx dy) spr-run spr-idle))
+    (local flip (if (> dx 0) 1 0)) ; Images face left.
+    (spr (alternate s) x y bg-colour 1 flip)) } ))
 
 ; Create the persistent entities.
 (new-map)
@@ -159,7 +176,7 @@
 ;; 002:55555555555555555555fff5555fcfff5ffffcfffffffcfff0f0ffff5fff0505
 ;; 003:55555555555555555555fff55fffcffffffffcfff0f0fcff5fffffff55550505
 ;; 016:5505055555000555c0d0d055c0000f0555fff00055000005555000055555f5f5
-;; 017:5505055555000555c0d0d055c0000f0555fff00055000005555000055555f5f5
+;; 017:5505055555000555c0d0d055c0000f0555fff0005500000555500005555f555f
 ;; 018:5505055555000555c0d0d055c0000f0555fff00055000005555000055555f5f5
 ;; 019:5505055555000555c0d0d055c0000f0555fff00555000000555000055555f5f5
 ;; </SPRITES>
