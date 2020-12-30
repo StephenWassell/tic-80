@@ -75,12 +75,11 @@
 
 (fn buttons []
   "Array of 0/1 for buttons pressed: up down left right"
-  [
+  (values
     (if (btn 0) 1 0)
     (if (btn 1) 1 0)
     (if (btn 2) 1 0)
-    (if (btn 3) 1 0)
-  ])
+    (if (btn 3) 1 0)))
 
 (fn to-mouse [from-x from-y]
   "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
@@ -93,14 +92,14 @@
   "Return direction to move player based on buttons and mouse."
   ; up down left right
   (local (ax ay) (match (buttons)
-    [1 0 0 0] (values 0 -1)
-    [0 1 0 0] (values 0 1)
-    [0 0 1 0] (values -1 0)
-    [0 0 0 1] (values 1 0)
-    [1 0 1 0] (values -1 -1)
-    [1 0 0 1] (values 1 -1)
-    [0 1 1 0] (values -1 1)
-    [0 1 0 1] (values 1 1)
+    (1 0 0 0) (values 0 -1)
+    (0 1 0 0) (values 0 1)
+    (0 0 1 0) (values -1 0)
+    (0 0 0 1) (values 1 0)
+    (1 0 1 0) (values -1 -1)
+    (1 0 0 1) (values 1 -1)
+    (0 1 1 0) (values -1 1)
+    (0 1 0 1) (values 1 1)
     _ (to-mouse from-x from-y))) ; No buttons pressed, go towards mouse.
   (normalise ax ay accel))
 
