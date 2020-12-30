@@ -20,6 +20,12 @@
 ; Call to check if the provides coords collide with each entity in the table.
 (var collides {}) ; id (fn [x y w h])
 
+(macro ++ [n]
+  "Increment n and return the new value."
+  `(do
+    (set ,n (+ ,n 1))
+    ,n))
+
 (global TIC
   (fn tic []
     "The main game loop. On each frame call all updaters then all drawers."
@@ -27,30 +33,28 @@
     ; todo: will this work? needs to be ipairs?
     (table.sort drawers #(< $1.z $2.z))
     (each [_ i (pairs drawers)] (i.f))
-    (set t (+ t 1))))
+    (++ t)))
 
 (fn xy-to-x [x y]
   "Calculate z-index from x and y coords. todo: is 0 fg or bg?"
   ((+ (* y 512) x)))
 
 (fn any-collides [x y w h check-id prev-id]
-  "Return true if the provided coords collide with any other entity."
+  "Return x and y multipliers if the provided coords collide with any other entity."
   ; Get the first/next collide closure. The prev-id param is initially nil.
   (local iter-id (next collides prev-id))
+  ; Iterate with tail recursion if entity check-id didn't collide with iter-id.
   (if
-    (= iter-id nil) false ; Reached end of list, no collisions.
+    (= iter-id nil) (values 1 1) ; Reached end of list with no collisions.
     (= iter-id check-id) (any-collides x y w h check-id iter-id) ; Don't collide with itself.
-    ((. collides iter-id) x y w h) true ; A collide closure returned true.
-    (any-collides x y w h check-id iter-id))) ; Tail recursion
+    (match ((. collides iter-id) x y w h)
+      (1 1) (any-collides x y w h check-id iter-id) ; This didn't collide.
+      (mx my) (values mx my)))) ; Found a collision, return multipliers.
 
-; Define function for constructors to call to get a new unique id.
-; It's a closure returned by new-unique-id.
-(local unique-id ((fn []
-  "Return a closure which increments id and returns the new value."
+(local unique-id ((fn [] ; Note double (
+  "Return a closure which increments id and returns the new value. Call in constructors."
   (var id 0)
-  (fn []
-    (set id (+ 1 id))
-    id))))
+  (fn [] (++ id)))))
 
 (fn new-map []
   "Create a new map object: draw the background, check for screen edge collisions."
@@ -60,11 +64,12 @@
     (cls bg-colour)) } )
 
   (tset collides id (fn [test-x test-y test-w test-h]
-    (or
-      (< test-x 0)
-      (< test-y 0)
-      (> (+ test-x test-w -1) screen-w)
-      (> (+ test-y test-h -1) screen-h)))))
+    "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
+    (values
+      ; Horizontal bounce
+      (if (or (< test-x 0) (> (+ test-x test-w -1) screen-w)) -.5 1)
+      ; Vertical bounce
+      (if (or (< test-y 0) (> (+ test-y test-h -1) screen-h)) -.5 1)))))
 
 (fn normalise [x y mag]
   "Normalise vector to a given magnitude."
@@ -131,6 +136,9 @@
   (var dx 0)
   (var dy 0)
 
+  ; Images face left. Set to 1 when moving right to flip the sprite.
+  (var flip 0)
+
   ; How fast can it run.
   (local accel .15)
   (local friction .9)
@@ -142,16 +150,20 @@
   (tset updaters id (fn []
     "Update dx dy based on buttons and mouse."
     (local (ax ay) (get-action (center x w) (center y h) accel))
+    (when (~= ax 0)
+      (set flip (if (> ax 0) 1 0))) ; Use ax not dx to avoid wiggling.
     (set dx (* friction (+ dx ax)))
     (set dy (* friction (+ dy ay)))
-    (when (any-collides (+ x dx) (+ y dy) w h id) (set dx 0) (set dy 0))))
+    ; Check if it would bounce off anything.
+    (local (mx my) (any-collides (+ x dx) (+ y dy) w h id))
+    (set dx (* dx mx))
+    (set dy (* dy my))))
 
   (tset drawers id { :z 1 :f (fn []
     "Update x y from dx dy and draw the sprite there."
     (set x (+ x dx))
     (set y (+ y dy))
     (local s (if (moving dx dy) spr-run spr-idle))
-    (local flip (if (> dx 0) 1 0)) ; Images face left.
     (spr (alternate s) x y bg-colour 1 flip)) } ))
 
 ; Create the persistent entities.
