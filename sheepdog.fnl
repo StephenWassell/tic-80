@@ -35,7 +35,7 @@
     (each [_ i (pairs drawers)] (i.f))
     (++ t)))
 
-(fn xy-to-x [x y]
+(fn xy-to-z [x y]
   "Calculate z-index from x and y coords. todo: is 0 fg or bg?"
   ((+ (* y 512) x)))
 
@@ -63,13 +63,13 @@
   (tset drawers id { :z 0 :f (fn []
     (cls bg-colour)) } )
 
-  (tset collides id (fn [test-x test-y test-w test-h]
+  (tset collides id (fn [tx ty tw th]
     "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
     (values
       ; Horizontal bounce
-      (if (or (< test-x 0) (> (+ test-x test-w -1) screen-w)) -.5 1)
+      (if (or (< tx 0) (> (+ tx tw -1) screen-w)) -.5 1)
       ; Vertical bounce
-      (if (or (< test-y 0) (> (+ test-y test-h -1) screen-h)) -.5 1)))))
+      (if (or (< ty 0) (> (+ ty th -1) screen-h)) -.5 1)))))
 
 (fn normalise [x y mag]
   "Normalise vector to a given magnitude."
@@ -114,7 +114,7 @@
 
 (fn alternate [s]
   "Alternate between s and s+1 for running feet and wagging tails."
-  (+ s (/ (% t 20) 10)))
+  (+ s (/ (% t 30) 15)))
 
 (fn moving [dx dy]
   "True if we need the sprite for moving, given pixels per frame."
@@ -166,9 +166,54 @@
     (local s (if (moving dx dy) spr-run spr-idle))
     (spr (alternate s) x y bg-colour 1 flip)) } ))
 
+
+(fn find-space [w h]
+  "Find a random location with no collisions within a border area."
+  (local x (math.random (- screen-w w)))
+  (local y (math.random (- screen-h h)))
+  (local border 8)
+  (match (any-collides (- x border) (- y border) (+ w border) (+ h border))
+    (1 1) (values x y)
+    _ (find-space w h)))
+
+(fn new-sheep []
+  "Create a new player object: respond to keys, draw on the foreground."
+  (local id (unique-id))
+  
+  (local w 8)
+  (local h 8)
+
+  (local spr-run 256)
+  (local spr-idle 258)
+
+  (var (x y) (find-space w h))
+  (var dx 0)
+  (var dy 0)
+
+  (tset drawers id { :z 1 :f (fn []
+    "Update x y from dx dy and draw the sprite there."
+    (set x (+ x dx))
+    (set y (+ y dy))
+    (local s (if (moving dx dy) spr-run spr-idle))
+    (spr (alternate s) x y bg-colour 1 flip)) } )
+
+  (tset collides id (fn [tx ty tw th]
+    "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
+    ; Does it overlap this on each side?
+    (local left (> (+ tx tw -1) x))
+    (local right (< tx (+ x w)))
+    (local top (> (+ ty th -1) y))
+    (local bottom (< ty (+ y h)))
+    (if
+      (not (and left right top bottom)) (values 1 1)
+      (values
+        (if (and left right) -.5 1)
+        (if (and top bottom) -.5 1))))))
+
 ; Create the persistent entities.
 (new-map)
 (new-player)
+(for [_ 1 2] (new-sheep))
 
 ;; <TILES>
 ;; 001:efffffffff222222f8888888f8222222f8fffffff8ff0ffff8ff0ffff8ff0fff
