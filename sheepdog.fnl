@@ -114,11 +114,31 @@
 
 (fn alternate [s]
   "Alternate between s and s+1 for running feet and wagging tails."
-  (+ s (/ (% t 30) 15)))
+  (+ s (/ (% t 24) 12)))
 
 (fn moving [dx dy]
   "True if we need the sprite for moving, given pixels per frame."
   (or (> (math.abs dx) .1) (> (math.abs dy) .1)))
+
+(macro sprite-drawer [x y dx dy sprite flip]
+  "Update x y from dx dy and draw the sprite there."
+  `(do
+    (set ,x (+ ,x ,dx))
+    (set ,y (+ ,y ,dy))
+    (spr (alternate ,sprite) x y bg-colour 1 ,flip)))
+
+(fn sprite-collider [tx ty tw th x y w h]
+  "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
+  ; Does it overlap this on each side?
+  (local left (> (+ tx tw -1) x))
+  (local right (< tx (+ x w)))
+  (local top (> (+ ty th -1) y))
+  (local bottom (< ty (+ y h)))
+  (if
+    (not (and left right top bottom)) (values 1 1)
+    (values ; todo: fix this to allow sliding
+      (if (and left right) -.5 1)
+      (if (and top bottom) -.5 1))))
 
 (fn new-player []
   "Create a new player object: respond to keys, draw on the foreground."
@@ -146,12 +166,14 @@
   ; Sprite indices, also +1 to each for alternate.
   (local spr-run 272)
   (local spr-idle 274)
+  (var sprite spr-idle)
 
   (tset updaters id (fn []
     "Update dx dy based on buttons and mouse."
     (local (ax ay) (get-action (center x w) (center y h) accel))
     (when (~= ax 0)
       (set flip (if (> ax 0) 1 0))) ; Use ax not dx to avoid wiggling.
+    (set sprite (if (or (~= ax 0) (~= ay 0)) spr-run spr-idle))
     (set dx (* friction (+ dx ax)))
     (set dy (* friction (+ dy ay)))
     ; Check if it would bounce off anything.
@@ -160,12 +182,10 @@
     (set dy (* dy my))))
 
   (tset drawers id { :z 1 :f (fn []
-    "Update x y from dx dy and draw the sprite there."
-    (set x (+ x dx))
-    (set y (+ y dy))
-    (local s (if (moving dx dy) spr-run spr-idle))
-    (spr (alternate s) x y bg-colour 1 flip)) } ))
+    (sprite-drawer x y dx dy sprite flip)) } )
 
+  (tset collides id (fn [tx ty tw th]
+    (sprite-collider tx ty tw th x y w h))))
 
 (fn find-space [w h]
   "Find a random location with no collisions within a border area."
@@ -183,37 +203,24 @@
   (local w 8)
   (local h 8)
 
-  (local spr-run 256)
-  (local spr-idle 258)
-
   (var (x y) (find-space w h))
   (var dx 0)
   (var dy 0)
 
+  (local spr-run 256)
+  (local spr-idle 258)
+  (var sprite spr-idle)
+
   (tset drawers id { :z 1 :f (fn []
-    "Update x y from dx dy and draw the sprite there."
-    (set x (+ x dx))
-    (set y (+ y dy))
-    (local s (if (moving dx dy) spr-run spr-idle))
-    (spr (alternate s) x y bg-colour 1 flip)) } )
+    (sprite-drawer x y dx dy sprite flip)) } )
 
   (tset collides id (fn [tx ty tw th]
-    "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
-    ; Does it overlap this on each side?
-    (local left (> (+ tx tw -1) x))
-    (local right (< tx (+ x w)))
-    (local top (> (+ ty th -1) y))
-    (local bottom (< ty (+ y h)))
-    (if
-      (not (and left right top bottom)) (values 1 1)
-      (values
-        (if (and left right) -.5 1)
-        (if (and top bottom) -.5 1))))))
+    (sprite-collider tx ty tw th x y w h))))
 
 ; Create the persistent entities.
 (new-map)
 (new-player)
-(for [_ 1 2] (new-sheep))
+(for [_ 1 40] (new-sheep))
 
 ;; <TILES>
 ;; 001:efffffffff222222f8888888f8222222f8fffffff8ff0ffff8ff0ffff8ff0fff
