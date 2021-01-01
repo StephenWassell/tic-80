@@ -51,7 +51,7 @@
       (1 1) (any-collides x y w h check-id iter-id) ; This didn't collide.
       (mx my) (values mx my)))) ; Found a collision, return multipliers.
 
-(local unique-id ((fn [] ; Note double (
+(local unique-id ((fn [] ; Note double ( to call the closure immediately.
   "Return a closure which increments id and returns the new value. Call in constructors."
   (var id 0)
   (fn [] (++ id)))))
@@ -79,7 +79,7 @@
     (values (* (/ x scale) mag) (* (/ y scale) mag))))
 
 (fn buttons []
-  "Array of 0/1 for buttons pressed: up down left right"
+  "List of 0/1 for buttons pressed: up down left right"
   (values
     (if (btn 0) 1 0)
     (if (btn 1) 1 0)
@@ -94,7 +94,7 @@
     (values 0 0)))
 
 (fn get-action [from-x from-y accel]
-  "Return direction to move player based on buttons and mouse."
+  "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
   ; up down left right
   (local (ax ay) (match (buttons)
     (1 0 0 0) (values 0 -1)
@@ -145,6 +145,8 @@
             (values 1 -.5) ; top/bottom
           (values -.5 1)))))) ; left/right
 
+(var to-player nil) ; Will be set to a method of player.
+
 (fn new-player []
   "Create a new player object: respond to keys, draw on the foreground."
   (local id (unique-id))
@@ -173,6 +175,9 @@
   (local spr-idle 274)
   (var sprite spr-idle)
 
+  (set to-player (fn [from-x from-y]
+    (values (- x from-x) (- y from-y))))
+
   (tset updaters id (fn []
     "Update dx dy based on buttons and mouse."
     (local (ax ay) (get-action (center x w) (center y h) accel))
@@ -199,7 +204,7 @@
   (local border 8)
   (match (any-collides (- x border) (- y border) (+ w (* 2 border)) (+ h (* 2 border)))
     (1 1) (values x y)
-    _ (find-space w h)))
+    _ (find-space w h))) ; Bad choice, recurse to try again.
 
 (fn new-sheep []
   "Create a new player object: respond to keys, draw on the foreground."
@@ -211,10 +216,29 @@
   (var (x y) (find-space w h))
   (var dx 0)
   (var dy 0)
+  (var flip 0)
+
+  (local accel .15)
+  (local friction .9)
 
   (local spr-run 256)
   (local spr-idle 258)
   (var sprite spr-idle)
+
+  (tset updaters id (fn []
+    "Escape player and todo: go towards flock"
+    (local (tpx tpy) (to-player x y))
+    (local (ax ay) (normalise tpx tpy (- 0 accel))) ; escape player
+
+    (when (~= ax 0)
+      (set flip (if (> ax 0) 1 0))) ; Use ax not dx to avoid wiggling.
+    (set sprite (if (or (~= ax 0) (~= ay 0)) spr-run spr-idle))
+    (set dx (* friction (+ dx ax)))
+    (set dy (* friction (+ dy ay)))
+    ; Check if it would bounce off anything.
+    (local (mx my) (any-collides (+ x dx) (+ y dy) w h id))
+    (set dx (* dx mx))
+    (set dy (* dy my))))
 
   (tset drawers id { :z 1 :f (fn []
     (sprite-drawer x y dx dy sprite flip)) } )
