@@ -129,16 +129,21 @@
 
 (fn sprite-collider [tx ty tw th x y w h]
   "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
-  ; Does it overlap this on each side?
-  (local left (> (+ tx tw -1) x))
-  (local right (< tx (+ x w)))
-  (local top (> (+ ty th -1) y))
-  (local bottom (< ty (+ y h)))
-  (if
-    (not (and left right top bottom)) (values 1 1)
-    (values ; todo: fix this to allow sliding
-      (if (and left right) -.5 1)
-      (if (and top bottom) -.5 1))))
+  ; todo: fix getting stuck in each other - when affected by bounce?
+  ; Coords of other entity relative to this one.
+  (let [rx (- tx x) ry (- ty y)]
+    (if
+      ; Check for no collision: left right top bottom.
+      (or (< (+ rx tw -1) 0) (> rx w) (< (+ ry th -1) 0) (> ry h))
+        (values 1 1)
+      ; There's a collision, check if it's top/bottom or left/right:
+      ; Imagine an X shape centered at x y. Which segment is tx ty in?
+      ; This is simplified, assumes both entities are the same size. todo: is that sufficient?
+      (let [grad (/ h w)] ; Gradient of the arms of the X.
+        (if
+          (= (< ry (* grad rx)) (< ry (* -1 grad rx)))
+            (values 1 -.5) ; top/bottom
+          (values -.5 1)))))) ; left/right
 
 (fn new-player []
   "Create a new player object: respond to keys, draw on the foreground."
@@ -192,7 +197,7 @@
   (local x (math.random (- screen-w w)))
   (local y (math.random (- screen-h h)))
   (local border 8)
-  (match (any-collides (- x border) (- y border) (+ w border) (+ h border))
+  (match (any-collides (- x border) (- y border) (+ w (* 2 border)) (+ h (* 2 border)))
     (1 1) (values x y)
     _ (find-space w h)))
 
@@ -220,7 +225,7 @@
 ; Create the persistent entities.
 (new-map)
 (new-player)
-(for [_ 1 40] (new-sheep))
+(for [_ 1 10] (new-sheep))
 
 ;; <TILES>
 ;; 001:efffffffff222222f8888888f8222222f8fffffff8ff0ffff8ff0ffff8ff0fff
