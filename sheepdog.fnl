@@ -223,6 +223,10 @@
   (local spr-idle 258)
   (var sprite spr-idle)
 
+  ; todo: replace with boids, no more hard collisions except boundary
+  ; all entities have an away-from method, other xywh => xy away if close enough else 0,0
+  ; sheep sum all those + xy to center of flock (average sheep xy from last frame)
+
   (tset updaters id (fn sheep-updated []
     "Escape player and todo: go towards flock"
     (local tp (to-player me))
