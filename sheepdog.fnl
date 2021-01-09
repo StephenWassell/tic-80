@@ -7,6 +7,26 @@
 (macro wh [w h] `{:w ,w :h ,h})
 (macro xywh [x y w h] `{:x ,x :y ,y :w ,w :h ,h})
 
+(macro setxy [dst src]
+  `(do
+    (tset ,dst x (. ,src x))
+    (tset ,dst y (. ,src y))))
+
+(fn xy* [v m] (xy (* v.x m) (* v.y m)))
+(fn xy/ [v d] (xy (/ v.x d) (/ v.y d)))
+(fn xy+ [a b] (xy (+ a.x b.x) (+ a.y b.y)))
+(fn xy- [a b] (xy (- a.x b.x) (- a.y b.y)))
+
+(fn magnitude [v]
+  (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
+ 
+(fn normalise [v mag]
+  "Normalise vector to a given magnitude."
+  (local scale (magnitude v))
+  (if
+    (< scale 1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
+    (xy* (xy/ v scale) mag)))
+
 ; TIC-80 screen size.
 (local screen (wh 240 136))
 
@@ -75,13 +95,6 @@
       ; Vertical bounce
       (if (or (< other.y 0) (> (+ other.y other.h -1) screen.h)) -.5 1)))))
 
-(fn normalise [v mag]
-  "Normalise vector to a given magnitude."
-  (local scale (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
-  (if
-    (< scale 1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
-    (xy (* (/ v.x scale) mag) (* (/ v.y scale) mag))))
-
 (fn buttons []
   "List of 0/1 for buttons pressed: up down left right"
   (values
@@ -126,6 +139,7 @@
 
 (fn sprite-drawer [me vel sprite flip]
   "Update x y from dx dy and draw the sprite there."
+  ; (setxy me (xy+ me vel))
   (set me.x (+ me.x vel.x))
   (set me.y (+ me.y vel.y))
   (spr (alternate sprite) me.x me.y bg-colour 1 flip))
@@ -175,8 +189,7 @@
   (local spr-idle 274)
   (var sprite spr-idle)
 
-  (set to-player (fn [from]
-    (xy (- me.x from.x) (- me.y from.y))))
+  (set to-player (fn [from] (xy- me from)))
 
   (tset updaters id (fn player-updater []
     "Update vel based on buttons and mouse."
@@ -185,7 +198,7 @@
     (when (~= action.x 0)
       (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
     (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
-    (set vel (xy (* friction (+ vel.x action.x)) (* friction (+ vel.y action.y))))
+    (set vel (xy* (xy+ vel action) friction))
     ; Check if it would bounce off anything.
     (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
     (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
