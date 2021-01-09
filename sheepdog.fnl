@@ -7,10 +7,9 @@
 (macro wh [w h] `{:w ,w :h ,h})
 (macro xywh [x y w h] `{:x ,x :y ,y :w ,w :h ,h})
 
-(macro setxy [dst src]
-  `(do
-    (tset ,dst x (. ,src x))
-    (tset ,dst y (. ,src y))))
+(fn setxy [dst src]
+  (tset dst :x (. src :x))
+  (tset dst :y (. src :y)))
 
 (fn xy* [v m] (xy (* v.x m) (* v.y m)))
 (fn xy/ [v d] (xy (/ v.x d) (/ v.y d)))
@@ -139,9 +138,7 @@
 
 (fn sprite-drawer [me vel sprite flip]
   "Update x y from dx dy and draw the sprite there."
-  ; (setxy me (xy+ me vel))
-  (set me.x (+ me.x vel.x))
-  (set me.y (+ me.y vel.y))
+  (setxy me (xy+ me vel))
   (spr (alternate sprite) me.x me.y bg-colour 1 flip))
 
 (fn sprite-collider [other me]
