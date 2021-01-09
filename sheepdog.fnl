@@ -21,10 +21,10 @@
  
 (fn normalise [v mag]
   "Normalise vector to a given magnitude."
-  (local scale (magnitude v))
-  (if
-    (< scale 1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
-    (xy* (xy/ v scale) mag)))
+  (let [scale (magnitude v)]
+    (if
+      (< scale 1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
+      (xy* (xy/ v scale) mag))))
 
 ; TIC-80 screen size.
 (local screen (wh 240 136))
@@ -40,7 +40,7 @@
 (var updaters {}) ; id (fn [])
 (var drawers {}) ; id { :z z :f (fn []) }
 ; Call to check if the provides coords collide with each entity in the table.
-(var collides {}) ; id (fn [x y w h])
+; (var collides {}) ; id (fn [x y w h])
 
 (macro ++ [n]
   "Increment n and return the new value."
@@ -61,18 +61,18 @@
   "Calculate z-index from x and y coords. todo: is 0 fg or bg?"
   ((+ (* c.y 512) c.x)))
 
-(fn any-collides [this check-id prev-id]
-  "Return x and y multipliers if the provided coords collide with any other entity."
-  ; Get the first/next collide closure. The prev-id param is initially nil.
-  (local next-id (next collides prev-id))
-  ; Iterate with tail recursion if entity check-id didn't collide with next-id.
-  (if
-    (= next-id nil) (xy 1 1) ; Reached end of list with no collisions.
-    (= next-id check-id) (any-collides this check-id next-id) ; Don't collide with itself.
-    (let [mult ((. collides next-id) this)]
-      (if (= mult.x mult.y 1)
-        (any-collides this check-id next-id) ; This didn't collide.
-        mult)))) ; Found a collision, return multipliers.
+; (fn any-collides [this check-id prev-id]
+;   "Return x and y multipliers if the provided coords collide with any other entity."
+;   ; Get the first/next collide closure. The prev-id param is initially nil.
+;   (local next-id (next collides prev-id))
+;   ; Iterate with tail recursion if entity check-id didn't collide with next-id.
+;   (if
+;     (= next-id nil) (xy 1 1) ; Reached end of list with no collisions.
+;     (= next-id check-id) (any-collides this check-id next-id) ; Don't collide with itself.
+;     (let [mult ((. collides next-id) this)]
+;       (if (= mult.x mult.y 1)
+;         (any-collides this check-id next-id) ; This didn't collide.
+;         mult)))) ; Found a collision, return multipliers.
 
 (local unique-id ((fn [] ; Note double ( to call the closure immediately.
   "Return a closure which increments id and returns the new value. Call in constructors."
@@ -86,13 +86,14 @@
   (tset drawers id { :z 0 :f (fn map-drawer []
     (cls bg-colour)) } )
 
-  (tset collides id (fn map-collider [other]
-    "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
-    (xy
-      ; Horizontal bounce
-      (if (or (< other.x 0) (> (+ other.x other.w -1) screen.w)) -.5 1)
-      ; Vertical bounce
-      (if (or (< other.y 0) (> (+ other.y other.h -1) screen.h)) -.5 1)))))
+  ; (tset collides id (fn map-collider [other]
+  ;   "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
+  ;   (xy
+  ;     ; Horizontal bounce
+  ;     (if (or (< other.x 0) (> (+ other.x other.w -1) screen.w)) -.5 1)
+  ;     ; Vertical bounce
+  ;     (if (or (< other.y 0) (> (+ other.y other.h -1) screen.h)) -.5 1)))))
+)
 
 (fn buttons []
   "List of 0/1 for buttons pressed: up down left right"
@@ -112,17 +113,17 @@
 (fn get-action [from accel]
   "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
   ; up down left right
-  (local (dir) (match (buttons)
-    (1 0 0 0) (xy 0 -1)
-    (0 1 0 0) (xy 0 1)
-    (0 0 1 0) (xy -1 0)
-    (0 0 0 1) (xy 1 0)
-    (1 0 1 0) (xy -1 -1)
-    (1 0 0 1) (xy 1 -1)
-    (0 1 1 0) (xy -1 1)
-    (0 1 0 1) (xy 1 1)
-    _ (to-mouse from))) ; No buttons pressed, go towards mouse.
-  (normalise dir accel))
+  (let [dir (match (buttons)
+      (1 0 0 0) (xy 0 -1)
+      (0 1 0 0) (xy 0 1)
+      (0 0 1 0) (xy -1 0)
+      (0 0 0 1) (xy 1 0)
+      (1 0 1 0) (xy -1 -1)
+      (1 0 0 1) (xy 1 -1)
+      (0 1 1 0) (xy -1 1)
+      (0 1 0 1) (xy 1 1)
+      _ (to-mouse from))] ; No buttons pressed, go towards mouse.
+    (normalise dir accel)))
 
 (fn center [me]
   "The center of a sprite given x y w h."
@@ -136,28 +137,36 @@
   "True if we need the sprite for moving, given pixels per frame."
   (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
+(fn stay-in-field [me]
+  (let [w (- screen.w me.w) h (- screen.h me.h)]
+    (when (< me.x 0) (set me.x 0))
+    (when (> me.x w) (set me.x w))
+    (when (< me.y 0) (set me.y 0))
+    (when (> me.y h) (set me.y h))))
+
 (fn sprite-drawer [me vel sprite flip]
   "Update x y from dx dy and draw the sprite there."
   (setxy me (xy+ me vel))
+  (stay-in-field me)
   (spr (alternate sprite) me.x me.y bg-colour 1 flip))
 
-(fn sprite-collider [other me]
-  "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
-  ; todo: fix getting stuck in each other - when affected by bounce?
-  ; Coords of other entity relative to this one.
-  (let [rx (- other.x me.x) ry (- other.y me.y)]
-    (if
-      ; Check for no collision: left right top bottom.
-      (or (< (+ rx other.w -1) 0) (> rx me.w) (< (+ ry other.h -1) 0) (> ry me.h))
-        (xy 1 1)
-      ; There's a collision, check if it's top/bottom or left/right:
-      ; Imagine an X shape centered at x y. Which segment is tx ty in?
-      ; This is simplified, assumes both entities are the same size. todo: is that sufficient?
-      (let [grad (/ me.h me.w)] ; Gradient of the arms of the X.
-        (if
-          (= (< ry (* grad rx)) (< ry (* -1 grad rx)))
-            (xy 1 -.5) ; top/bottom
-          (xy -.5 1)))))) ; left/right
+; (fn sprite-collider [other me]
+;   "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
+;   ; todo: fix getting stuck in each other - when affected by bounce?
+;   ; Coords of other entity relative to this one.
+;   (let [rx (- other.x me.x) ry (- other.y me.y)]
+;     (if
+;       ; Check for no collision: left right top bottom.
+;       (or (< (+ rx other.w -1) 0) (> rx me.w) (< (+ ry other.h -1) 0) (> ry me.h))
+;         (xy 1 1)
+;       ; There's a collision, check if it's top/bottom or left/right:
+;       ; Imagine an X shape centered at x y. Which segment is tx ty in?
+;       ; This is simplified, assumes both entities are the same size. todo: is that sufficient?
+;       (let [grad (/ me.h me.w)] ; Gradient of the arms of the X.
+;         (if
+;           (= (< ry (* grad rx)) (< ry (* -1 grad rx)))
+;             (xy 1 -.5) ; top/bottom
+;           (xy -.5 1)))))) ; left/right
 
 (var to-player nil) ; Will be set to a method of player.
 
@@ -195,28 +204,30 @@
     (when (~= action.x 0)
       (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
     (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
-    (set vel (xy* (xy+ vel action) friction))
+    (set vel (xy* (xy+ vel action) friction))))
     ; Check if it would bounce off anything.
-    (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
-    (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
+    ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
+    ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
 
   (tset drawers id { :z 1 :f (fn player-drawer []
     (sprite-drawer me vel sprite flip)) } )
 
-  (tset collides id (fn player-collider [other]
-    (sprite-collider other me))))
+  ; (tset collides id (fn player-collider [other]
+  ;   (sprite-collider other me))))
+)
 
 (fn find-space [size]
   "Find a random location with no collisions within a border area."
   (local x (math.random (- screen.w size.w)))
   (local y (math.random (- screen.h size.h)))
-  (local border 8)
-  (match (any-collides (xywh (- x border) (- y border) (+ size.w (* 2 border)) (+ size.h (* 2 border))))
-    {:x 1 :y 1} (xy x y)
-    _ (find-space size))) ; Bad choice, recurse to try again.
+  (xy x y))
+  ; (local border 8)
+  ; (match (any-collides (xywh (- x border) (- y border) (+ size.w (* 2 border)) (+ size.h (* 2 border))))
+  ;   {:x 1 :y 1} (xy x y)
+  ;   _ (find-space size))) ; Bad choice, recurse to try again.
 
 (fn new-sheep []
-  "Create a new player object: respond to keys, draw on the foreground."
+  "Create a new sheep object."
   (local id (unique-id))
   
   (var me (find-space (wh 8 8)))
@@ -245,16 +256,17 @@
     (when (~= action.x 0)
       (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
     (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
-    (set vel (xy (* friction (+ vel.x action.x)) (* friction (+ vel.y action.y))))
+    (set vel (xy (* friction (+ vel.x action.x)) (* friction (+ vel.y action.y))))))
     ; Check if it would bounce off anything.
-    (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
-    (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
+    ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
+    ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
 
   (tset drawers id { :z 1 :f (fn sheep-drawer []
     (sprite-drawer me vel sprite flip)) } )
 
-  (tset collides id (fn sheep-collider [other]
-    (sprite-collider other me))))
+  ; (tset collides id (fn sheep-collider [other]
+  ;   (sprite-collider other me))))
+)
 
 ; Create the persistent entities.
 (new-map)
