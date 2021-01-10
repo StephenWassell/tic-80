@@ -8,23 +8,27 @@
 (macro xywh [x y w h] `{:x ,x :y ,y :w ,w :h ,h})
 
 (fn setxy [dst src]
-  (tset dst :x (. src :x))
-  (tset dst :y (. src :y)))
+  (set dst.x src.x)
+  (set dst.y src.y))
 
 (fn xy* [v m] (xy (* v.x m) (* v.y m)))
 (fn xy/ [v d] (xy (/ v.x d) (/ v.y d)))
 (fn xy+ [a b] (xy (+ a.x b.x) (+ a.y b.y)))
 (fn xy- [a b] (xy (- a.x b.x) (- a.y b.y)))
+(fn xy0? [v] (= v.x v.y 0))
 
 (fn magnitude [v]
   (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
- 
+
 (fn normalise [v mag]
   "Normalise vector to a given magnitude."
   (let [scale (magnitude v)]
     (if
       (< scale 1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
       (xy* (xy/ v scale) mag))))
+
+(fn xy-random []
+  (xy (- (math.random) .5) (- (math.random) .5)))
 
 ; TIC-80 screen size.
 (local screen (wh 240 136))
@@ -37,8 +41,9 @@
 
 ; Tables of entity id => closure.
 ; These are called on each frame in this order.
-(var updaters {}) ; id (fn [])
-(var drawers {}) ; id { :z z :f (fn []) }
+(var fns-update {}) ; id (fn [])
+(var fns-move-away {})
+(var fns-draw {}) ; id { :z z :f (fn []) }
 ; Call to check if the provides coords collide with each entity in the table.
 ; (var collides {}) ; id (fn [x y w h])
 
@@ -51,10 +56,10 @@
 (global TIC
   (fn tic []
     "The main game loop. On each frame call all updaters then all drawers."
-    (each [_ f (pairs updaters)] (f))
+    (each [_ f (pairs fns-update)] (f))
     ; todo: will this work? needs to be ipairs?
-    (table.sort drawers #(< $1.z $2.z))
-    (each [_ i (pairs drawers)] (i.f))
+    (table.sort fns-draw #(< $1.z $2.z))
+    (each [_ i (pairs fns-draw)] (i.f))
     (++ t)))
 
 (fn xy-to-z [c]
@@ -83,7 +88,7 @@
   "Create a new map object: draw the background, check for screen edge collisions."
   (local id (unique-id))
 
-  (tset drawers id { :z 0 :f (fn map-drawer []
+  (tset fns-draw id { :z 0 :f (fn map-draw []
     (cls bg-colour)) } )
 
   ; (tset collides id (fn map-collider [other]
@@ -144,7 +149,7 @@
     (when (< me.y 0) (set me.y 0))
     (when (> me.y h) (set me.y h))))
 
-(fn sprite-drawer [me vel sprite flip]
+(fn sprite-draw [me vel sprite flip]
   "Update x y from dx dy and draw the sprite there."
   (setxy me (xy+ me vel))
   (stay-in-field me)
@@ -168,7 +173,7 @@
 ;             (xy 1 -.5) ; top/bottom
 ;           (xy -.5 1)))))) ; left/right
 
-(var to-player nil) ; Will be set to a method of player.
+; (var to-player nil) ; Will be set to a method of player.
 
 (fn new-player []
   "Create a new player object: respond to keys, draw on the foreground."
@@ -195,9 +200,15 @@
   (local spr-idle 274)
   (var sprite spr-idle)
 
-  (set to-player (fn [from] (xy- me from)))
+  ; (set to-player (fn [from] (xy- me from)))
 
-  (tset updaters id (fn player-updater []
+  (tset fns-move-away id (fn sheep-move-away [from]
+    (let [away (xy- from me)]
+      (if (< (magnitude away) 50)
+        (normalise away 1)
+        (xy 0 0)))))
+
+  (tset fns-update id (fn player-update []
     "Update vel based on buttons and mouse."
     (local (action) (get-action (center me) accel))
 
@@ -209,8 +220,8 @@
     ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
     ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
 
-  (tset drawers id { :z 1 :f (fn player-drawer []
-    (sprite-drawer me vel sprite flip)) } )
+  (tset fns-draw id { :z 1 :f (fn player-draw []
+    (sprite-draw me vel sprite flip)) } )
 
   ; (tset collides id (fn player-collider [other]
   ;   (sprite-collider other me))))
@@ -248,10 +259,23 @@
   ; all entities have an away-from method, other xywh => xy away if close enough else 0,0
   ; sheep sum all those + xy to center of flock (average sheep xy from last frame)
 
-  (tset updaters id (fn sheep-updated []
+  (tset fns-move-away id (fn sheep-move-away [from]
+    (let [away (xy- from me) mag (magnitude away)]
+      (if
+        (> mag 10) (xy 0 0)
+        (if
+          (< mag 2) (normalise (xy-random) 1) ; todo: still getting stuck together
+          (normalise away 1))))))
+
+  (tset fns-update id (fn sheep-update []
     "Escape player and todo: go towards flock"
-    (local tp (to-player me))
-    (local action (normalise tp (- 0 accel))) ; escape player
+    ; (local tp (to-player me))
+    ; (local action (normalise tp (- 0 accel))) ; escape player
+
+    (var action (xy 0 0))
+    (each [it f (pairs fns-move-away)]
+      (when (~= it id) (setxy action (xy+ action (f me)))))
+    (setxy action (normalise action accel))
 
     (when (~= action.x 0)
       (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
@@ -261,8 +285,8 @@
     ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
     ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
 
-  (tset drawers id { :z 1 :f (fn sheep-drawer []
-    (sprite-drawer me vel sprite flip)) } )
+  (tset fns-draw id { :z 1 :f (fn sheep-draw []
+    (sprite-draw me vel sprite flip)) } )
 
   ; (tset collides id (fn sheep-collider [other]
   ;   (sprite-collider other me))))
