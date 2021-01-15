@@ -187,6 +187,12 @@
         (if (< mag 1) (xy-random) ; todo: still getting stuck together
             (normalise away (/ strength mag))))))
 
+(fn move-away-from-all [me id]
+  (var action (xy 0 0))
+  (each [it f (pairs fns-move-away)]
+    (when (~= it id) (setxy action (xy+ action (f me)))))
+  action)
+
 (fn new-player []
   "Create a new player object: respond to keys, draw on the foreground."
   (local id (unique-id))
@@ -219,7 +225,9 @@
 
   (tset fns-update id (fn player-update []
     "Update vel based on buttons and mouse."
-    (local (action) (get-action (center me) accel))
+    (local action (xy+
+      (get-action (center me) accel)
+      (normalise (move-away-from-all me id) .5)))
 
     (when (~= action.x 0)
       (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
@@ -276,9 +284,7 @@
     ; (local tp (to-player me))
     ; (local action (normalise tp (- 0 accel))) ; escape player
 
-    (var action (xy 0 0))
-    (each [it f (pairs fns-move-away)]
-      (when (~= it id) (setxy action (xy+ action (f me)))))
+    (var action (move-away-from-all me id))
     (when (xy0? action) (setxy action (xy- herd-center me)))
     (setxy action (normalise action accel))
 
