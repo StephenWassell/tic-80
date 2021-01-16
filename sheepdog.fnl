@@ -224,7 +224,7 @@
     (move-away from me 50)))
 
   (tset fns-update id (fn player-update []
-    "Update vel based on buttons and mouse."
+    "Update vel based on buttons and mouse, and avoid running over sheep."
     (local action (xy+
       (get-action (center me) accel)
       (normalise (move-away-from-all me id) .5)))
@@ -272,10 +272,6 @@
   (local spr-idle 258)
   (var sprite spr-idle)
 
-  ; todo: replace with boids, no more hard collisions except boundary
-  ; all entities have an away-from method, other xywh => xy away if close enough else 0,0
-  ; sheep sum all those + xy to center of flock (average sheep xy from last frame)
-
   (tset fns-move-away id (fn sheep-move-away [from]
     (move-away from me 10)))
 
@@ -285,7 +281,8 @@
     ; (local action (normalise tp (- 0 accel))) ; escape player
 
     (var action (move-away-from-all me id))
-    (when (xy0? action) (setxy action (xy- herd-center me)))
+    (when (not (xy0? action))
+      (setxy action (xy+ action (normalise (xy- herd-center me) 1))))
     (setxy action (normalise action accel))
 
     (when (~= action.x 0)
