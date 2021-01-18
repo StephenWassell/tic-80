@@ -8,8 +8,8 @@
 (macro xywh [x y w h] `{:x ,x :y ,y :w ,w :h ,h})
 
 (fn setxy [dst src]
-  (set dst.x src.x)
-  (set dst.y src.y))
+    (set dst.x src.x)
+    (set dst.y src.y))
 
 (fn xy* [v m] (xy (* v.x m) (* v.y m)))
 (fn xy/ [v d] (xy (/ v.x d) (/ v.y d)))
@@ -18,16 +18,16 @@
 (fn xy0? [v] (= v.x v.y 0))
 
 (fn magnitude [v]
-  (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
+    (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
 
 (fn normalise [v mag]
-  "Normalise vector to a given magnitude."
-  (let [scale (magnitude v)]
-    (if (< scale .1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
-        (xy* (xy/ v scale) mag))))
+    "Normalise vector to a given magnitude."
+    (let [scale (magnitude v)]
+      (if (< scale .1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
+          (xy* (xy/ v scale) mag))))
 
 (fn xy-random []
-  (xy (- (math.random) .5) (- (math.random) .5)))
+    (xy (- (math.random) .5) (- (math.random) .5)))
 
 ; TIC-80 screen size.
 (local screen (wh 240 136))
@@ -50,27 +50,27 @@
 ; (var collides {}) ; id (fn [x y w h])
 
 (macro ++ [n]
-  "Increment n and return the new value."
-  `(do
-    (set ,n (+ ,n 1))
-    ,n))
+       "Increment n and return the new value."
+       `(do
+            (set ,n (+ ,n 1))
+          ,n))
 
 (global TIC
-  (fn tic []
-    "The main game loop. On each frame call all updaters then all drawers."
-    (each [_ f (pairs fns-update)] (f))
+        (fn tic []
+            "The main game loop. On each frame call all updaters then all drawers."
+            (each [_ f (pairs fns-update)] (f))
 
-    (setxy herd-center (xy 0 0))
-    ; todo: will this work? needs to be ipairs?
-    (table.sort fns-draw #(< $1.z $2.z))
-    (each [_ i (pairs fns-draw)] (i.f))
-    (setxy herd-center (xy/ herd-center sheep-count))
+            (setxy herd-center (xy 0 0))
+            ; todo: will this work? needs to be ipairs?
+            (table.sort fns-draw #(< $1.z $2.z))
+            (each [_ i (pairs fns-draw)] (i.f))
+            (setxy herd-center (xy/ herd-center sheep-count))
 
-    (++ t)))
+            (++ t)))
 
 (fn xy-to-z [c]
-  "Calculate z-index from x and y coords. todo: is 0 fg or bg?"
-  ((+ (* c.y 512) c.x)))
+    "Calculate z-index from x and y coords. todo: is 0 fg or bg?"
+    ((+ (* c.y 512) c.x)))
 
 ; (fn any-collides [this check-id prev-id]
 ;   "Return x and y multipliers if the provided coords collide with any other entity."
@@ -86,79 +86,79 @@
 ;         mult)))) ; Found a collision, return multipliers.
 
 (local unique-id ((fn [] ; Note double ( to call the closure immediately.
-  "Return a closure which increments id and returns the new value. Call in constructors."
-  (var id 0)
-  (fn [] (++ id)))))
+                      "Return a closure which increments id and returns the new value. Call in constructors."
+                      (var id 0)
+                      (fn [] (++ id)))))
 
 (fn new-map []
-  "Create a new map object: draw the background, check for screen edge collisions."
-  (local id (unique-id))
+    "Create a new map object: draw the background, check for screen edge collisions."
+    (local id (unique-id))
 
-  (tset fns-draw id { :z 0 :f (fn map-draw []
-    (cls bg-colour)) } )
+    (tset fns-draw id { :z 0 :f (fn map-draw []
+                                    (cls bg-colour)) } )
 
-  ; (tset collides id (fn map-collider [other]
-  ;   "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
-  ;   (xy
-  ;     ; Horizontal bounce
-  ;     (if (or (< other.x 0) (> (+ other.x other.w -1) screen.w)) -.5 1)
-  ;     ; Vertical bounce
-  ;     (if (or (< other.y 0) (> (+ other.y other.h -1) screen.h)) -.5 1)))))
-)
+    ; (tset collides id (fn map-collider [other]
+    ;   "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
+    ;   (xy
+    ;     ; Horizontal bounce
+    ;     (if (or (< other.x 0) (> (+ other.x other.w -1) screen.w)) -.5 1)
+    ;     ; Vertical bounce
+    ;     (if (or (< other.y 0) (> (+ other.y other.h -1) screen.h)) -.5 1)))))
+    )
 
 (fn buttons []
-  "List of 0/1 for buttons pressed: up down left right"
-  (values
-    (if (btn 0) 1 0)
-    (if (btn 1) 1 0)
-    (if (btn 2) 1 0)
-    (if (btn 3) 1 0)))
+    "List of 0/1 for buttons pressed: up down left right"
+    (values
+     (if (btn 0) 1 0)
+     (if (btn 1) 1 0)
+     (if (btn 2) 1 0)
+     (if (btn 3) 1 0)))
 
 (fn to-mouse [from]
-  "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
-  (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
-  (if (or left middle right) (xy (- mouse-x from.x) (- mouse-y from.y))
-      (xy 0 0)))
+    "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
+    (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
+    (if (or left middle right) (xy (- mouse-x from.x) (- mouse-y from.y))
+        (xy 0 0)))
 
 (fn get-action [from accel]
-  "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
-  ; up down left right
-  (let [dir (match (buttons)
-              (1 0 0 0) (xy 0 -1)
-              (0 1 0 0) (xy 0 1)
-              (0 0 1 0) (xy -1 0)
-              (0 0 0 1) (xy 1 0)
-              (1 0 1 0) (xy -1 -1)
-              (1 0 0 1) (xy 1 -1)
-              (0 1 1 0) (xy -1 1)
-              (0 1 0 1) (xy 1 1)
-              _ (to-mouse from))] ; No buttons pressed, go towards mouse.
-    (normalise dir accel)))
+    "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
+    ; up down left right
+    (let [dir (match (buttons)
+                (1 0 0 0) (xy 0 -1)
+                (0 1 0 0) (xy 0 1)
+                (0 0 1 0) (xy -1 0)
+                (0 0 0 1) (xy 1 0)
+                (1 0 1 0) (xy -1 -1)
+                (1 0 0 1) (xy 1 -1)
+                (0 1 1 0) (xy -1 1)
+                (0 1 0 1) (xy 1 1)
+                _ (to-mouse from))] ; No buttons pressed, go towards mouse.
+      (normalise dir accel)))
 
 (fn center [me]
-  "The center of a sprite given x y w h."
-  (xy (+ me.x (/ me.w 2)) (+ me.y (/ me.h 2))))
+    "The center of a sprite given x y w h."
+    (xy (+ me.x (/ me.w 2)) (+ me.y (/ me.h 2))))
 
 (fn alternate [s id]
-  "Alternate between s and s+1 for running feet and wagging tails."
-  (+ s (/ (% (+ t (* id 10)) 24) 12)))
+    "Alternate between s and s+1 for running feet and wagging tails."
+    (+ s (/ (% (+ t (* id 10)) 24) 12)))
 
 (fn moving [d]
-  "True if we need the sprite for moving, given pixels per frame."
-  (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
+    "True if we need the sprite for moving, given pixels per frame."
+    (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
 (fn stay-in-field [me vel]
-  (let [w (- screen.w me.w) h (- screen.h me.h)]
-    (when (< me.x 0) (set me.x 0) (set vel.x 0))
-    (when (> me.x w) (set me.x w) (set vel.x 0))
-    (when (< me.y 0) (set me.y 0) (set vel.y 0))
-    (when (> me.y h) (set me.y h) (set vel.y 0))))
+    (let [w (- screen.w me.w) h (- screen.h me.h)]
+      (when (< me.x 0) (set me.x 0) (set vel.x 0))
+      (when (> me.x w) (set me.x w) (set vel.x 0))
+      (when (< me.y 0) (set me.y 0) (set vel.y 0))
+      (when (> me.y h) (set me.y h) (set vel.y 0))))
 
 (fn sprite-draw [id me vel sprite flip]
-  "Update x y from dx dy and draw the sprite there."
-  (setxy me (xy+ me vel))
-  (stay-in-field me vel)
-  (spr (alternate sprite id) me.x me.y bg-colour 1 flip))
+    "Update x y from dx dy and draw the sprite there."
+    (setxy me (xy+ me vel))
+    (stay-in-field me vel)
+    (spr (alternate sprite id) me.x me.y bg-colour 1 flip))
 
 ; (fn sprite-collider [other me]
 ;   "Return x and y multipliers to apply to the other entity, (1 1) for no collision."
@@ -181,125 +181,125 @@
 ; (var to-player nil) ; Will be set to a method of player.
 
 (fn move-away [from me strength]
-  (let [away (xy+ (xy* (xy-random) 5) (xy- from me))
-        mag (magnitude away)]
-    (if (> mag strength) (xy 0 0)
-        (if (< mag 1) (xy-random) ; todo: still getting stuck together
-            (normalise away (/ strength mag))))))
+    (let [away (xy+ (xy* (xy-random) 5) (xy- from me))
+               mag (magnitude away)]
+      (if (> mag strength) (xy 0 0)
+          (< mag 1) (xy-random) ; todo: still getting stuck together
+          (normalise away (/ strength mag)))))
 
 (fn move-away-from-all [me id]
-  (var action (xy 0 0))
-  (each [it f (pairs fns-move-away)]
-    (when (~= it id) (setxy action (xy+ action (f me)))))
-  action)
+    (var action (xy 0 0))
+    (each [it f (pairs fns-move-away)]
+          (when (~= it id) (setxy action (xy+ action (f me)))))
+    action)
 
 (fn new-player []
-  "Create a new player object: respond to keys, draw on the foreground."
-  (local id (unique-id))
+    "Create a new player object: respond to keys, draw on the foreground."
+    (local id (unique-id))
   
-  ; Size of the dog. todo: shorter than this
-  ; Current location, updated in drawer.
-  (var me (xywh
-    (/ (- screen.w 8) 2) (/ (- screen.h 8) 2)
-    8 8))
+    ; Size of the dog. todo: shorter than this
+    ; Current location, updated in drawer.
+    (var me (xywh
+             (/ (- screen.w 8) 2) (/ (- screen.h 8) 2)
+             8 8))
 
-  ; Current velocity in pixels per frame, updated in updater.
-  (var vel (xy 0 0))
+    ; Current velocity in pixels per frame, updated in updater.
+    (var vel (xy 0 0))
 
-  ; Images face left. Set to 1 when moving right to flip the sprite.
-  (var flip 0)
+    ; Images face left. Set to 1 when moving right to flip the sprite.
+    (var flip 0)
 
-  ; How fast can it run.
-  (local accel .15)
-  (local friction .9)
+    ; How fast can it run.
+    (local accel .15)
+    (local friction .9)
 
-  ; Sprite indices, also +1 to each for alternate.
-  (local spr-run 272)
-  (local spr-idle 274)
-  (var sprite spr-idle)
+    ; Sprite indices, also +1 to each for alternate.
+    (local spr-run 272)
+    (local spr-idle 274)
+    (var sprite spr-idle)
 
-  ; (set to-player (fn [from] (xy- me from)))
+    ; (set to-player (fn [from] (xy- me from)))
 
-  (tset fns-move-away id (fn sheep-move-away [from]
-    (move-away from me 50)))
+    (tset fns-move-away id (fn sheep-move-away [from]
+                               (move-away from me 50)))
 
-  (tset fns-update id (fn player-update []
-    "Update vel based on buttons and mouse, and avoid running over sheep."
-    (local action (xy+
-      (get-action (center me) accel)
-      (normalise (move-away-from-all me id) .5)))
+    (tset fns-update id (fn player-update []
+                            "Update vel based on buttons and mouse, and avoid running over sheep."
+                            (local action (xy+
+                                           (get-action (center me) accel)
+                                           (normalise (move-away-from-all me id) .5)))
 
-    (when (~= action.x 0)
-      (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
-    (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
-    (set vel (xy* (xy+ vel action) friction))))
+                            (when (~= action.x 0)
+                              (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
+                            (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
+                            (set vel (xy* (xy+ vel action) friction))))
     ; Check if it would bounce off anything.
     ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
     ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
 
-  (tset fns-draw id { :z 1 :f (fn player-draw []
-    (sprite-draw id me vel sprite flip)) } )
+    (tset fns-draw id { :z 1 :f (fn player-draw []
+                                    (sprite-draw id me vel sprite flip)) } )
 
-  ; (tset collides id (fn player-collider [other]
-  ;   (sprite-collider other me))))
-)
+    ; (tset collides id (fn player-collider [other]
+    ;   (sprite-collider other me))))
+    )
 
 (fn find-space [size]
-  "Find a random location with no collisions within a border area."
-  (local x (math.random (- screen.w size.w)))
-  (local y (math.random (- screen.h size.h)))
-  (xy x y))
-  ; (local border 8)
-  ; (match (any-collides (xywh (- x border) (- y border) (+ size.w (* 2 border)) (+ size.h (* 2 border))))
-  ;   {:x 1 :y 1} (xy x y)
-  ;   _ (find-space size))) ; Bad choice, recurse to try again.
+    "Find a random location with no collisions within a border area."
+    (local x (math.random (- screen.w size.w)))
+    (local y (math.random (- screen.h size.h)))
+    (xy x y))
+; (local border 8)
+; (match (any-collides (xywh (- x border) (- y border) (+ size.w (* 2 border)) (+ size.h (* 2 border))))
+;   {:x 1 :y 1} (xy x y)
+;   _ (find-space size))) ; Bad choice, recurse to try again.
 
 (fn new-sheep []
-  "Create a new sheep object."
-  (local id (unique-id))
+    "Create a new sheep object."
+    (local id (unique-id))
   
-  (var me (find-space (wh 8 8)))
-  (set me.w 8)
-  (set me.h 8)
+    (var me (find-space (wh 8 8)))
+    (set me.w 8)
+    (set me.h 8)
 
-  (var vel (xy 0 0))
-  (var flip 0)
+    (var vel (xy 0 0))
+    (var flip 0)
 
-  (local accel .15)
-  (local friction .9)
+    (local accel .15)
+    (local friction .9)
 
-  (local spr-run 256)
-  (local spr-idle 258)
-  (var sprite spr-idle)
+    (local spr-run 256)
+    (local spr-idle 258)
+    (var sprite spr-idle)
 
-  (tset fns-move-away id (fn sheep-move-away [from]
-    (move-away from me 10)))
+    (tset fns-move-away id (fn sheep-move-away [from]
+                               (move-away from me 10)))
 
-  (tset fns-update id (fn sheep-update []
-    "Escape player and todo: go towards flock"
-    ; (local tp (to-player me))
-    ; (local action (normalise tp (- 0 accel))) ; escape player
+    (tset fns-update id (fn sheep-update []
+                            "Escape player and todo: go towards flock"
+                            ; (local tp (to-player me))
+                            ; (local action (normalise tp (- 0 accel))) ; escape player
 
-    (var action (move-away-from-all me id))
-    (when (not (xy0? action))
-      (setxy action (xy+ action (normalise (xy- herd-center me) 1))))
-    (setxy action (normalise action accel))
+                            (var action (move-away-from-all me id))
+                            (when (not (xy0? action))
+                              (setxy action (xy+ action (normalise (xy- herd-center me) 1))))
+                            (setxy action (normalise action accel))
 
-    (when (~= action.x 0)
-      (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
-    (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
-    (set vel (xy (* friction (+ vel.x action.x)) (* friction (+ vel.y action.y))))))
+                            (when (~= action.x 0)
+                              (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
+                            (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
+                            (set vel (xy (* friction (+ vel.x action.x)) (* friction (+ vel.y action.y))))))
     ; Check if it would bounce off anything.
     ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
     ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
 
-  (tset fns-draw id { :z 1 :f (fn sheep-draw []
-    (sprite-draw id me vel sprite flip)
-    (setxy herd-center (xy+ herd-center me))) } )
+    (tset fns-draw id { :z 1 :f (fn sheep-draw []
+                                    (sprite-draw id me vel sprite flip)
+                                    (setxy herd-center (xy+ herd-center me))) } )
 
-  ; (tset collides id (fn sheep-collider [other]
-  ;   (sprite-collider other me))))
-)
+    ; (tset collides id (fn sheep-collider [other]
+    ;   (sprite-collider other me))))
+    )
 
 ; Create the persistent entities.
 (new-map)
