@@ -4,8 +4,8 @@
 ;; script: fennel
 
 (macro xy [x y] `{:x ,x :y ,y})
-(macro wh [w h] `{:w ,w :h ,h})
-(macro xywh [x y w h] `{:x ,x :y ,y :w ,w :h ,h})
+;(macro wh [w h] `{:w ,w :h ,h})
+;(macro xywh [x y w h] `{:x ,x :y ,y :w ,w :h ,h})
 
 (fn setxy [dst src]
     (set dst.x src.x)
@@ -30,7 +30,11 @@
     (xy (- (math.random) .5) (- (math.random) .5)))
 
 ; TIC-80 screen size.
-(local screen (wh 240 136))
+(local screen-w 240)
+(local screen-h 136)
+; Reduced by the size of a sprite.
+(local screen-w-s (- screen-w 8))
+(local screen-h-s (- screen-h 8))
 
 ; Background of the map and transparent sprites - dark green.
 (local bg-colour 5)
@@ -122,8 +126,8 @@
 
 (fn get-action [from accel]
     "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
-    ; up down left right
     (let [dir (match (buttons)
+                ; up down left right
                 (1 0 0 0) (xy 0 -1)
                 (0 1 0 0) (xy 0 1)
                 (0 0 1 0) (xy -1 0)
@@ -137,7 +141,7 @@
 
 (fn center [me]
     "The center of a sprite given x y w h."
-    (xy (+ me.x (/ me.w 2)) (+ me.y (/ me.h 2))))
+    (xy (+ me.x 4) (+ me.y 4)))
 
 (fn alternate [s id]
     "Alternate between s and s+1 for running feet and wagging tails."
@@ -148,11 +152,10 @@
     (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
 (fn stay-in-field [me vel]
-    (let [w (- screen.w me.w) h (- screen.h me.h)]
-      (when (< me.x 0) (set me.x 0) (set vel.x 0))
-      (when (> me.x w) (set me.x w) (set vel.x 0))
-      (when (< me.y 0) (set me.y 0) (set vel.y 0))
-      (when (> me.y h) (set me.y h) (set vel.y 0))))
+    (when (< me.x 0) (set me.x 0) (set vel.x 0))
+    (when (< me.y 0) (set me.y 0) (set vel.y 0))
+    (when (> me.x screen-w-s) (set me.x screen-w-s) (set vel.x 0))
+    (when (> me.y screen-h-s) (set me.y screen-h-s) (set vel.y 0)))
 
 (fn sprite-draw [id me vel sprite flip]
     "Update x y from dx dy and draw the sprite there."
@@ -199,9 +202,7 @@
   
     ; Size of the dog. todo: shorter than this
     ; Current location, updated in drawer.
-    (var me (xywh
-             (/ (- screen.w 8) 2) (/ (- screen.h 8) 2)
-             8 8))
+    (var me (xy (/ screen-w-s 2) (/ screen-h-s 2)))
 
     ; Current velocity in pixels per frame, updated in updater.
     (var vel (xy 0 0))
@@ -244,23 +245,11 @@
     ;   (sprite-collider other me))))
     )
 
-(fn find-space [size]
-    "Find a random location with no collisions within a border area."
-    (local x (math.random (- screen.w size.w)))
-    (local y (math.random (- screen.h size.h)))
-    (xy x y))
-; (local border 8)
-; (match (any-collides (xywh (- x border) (- y border) (+ size.w (* 2 border)) (+ size.h (* 2 border))))
-;   {:x 1 :y 1} (xy x y)
-;   _ (find-space size))) ; Bad choice, recurse to try again.
-
 (fn new-sheep []
     "Create a new sheep object."
     (local id (unique-id))
   
-    (var me (find-space (wh 8 8)))
-    (set me.w 8)
-    (set me.h 8)
+    (var me (xy (math.random screen-w-s) (math.random screen-h-s)))
 
     (var vel (xy 0 0))
     (var flip 0)
