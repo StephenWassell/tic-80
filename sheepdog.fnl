@@ -133,8 +133,8 @@
   Include some randomness to avoid them getting stuck together."
   (let [away (xy+ (xy* (xy-random) 5) (xy- from me))
         mag (magnitude away)]
-    (if (> mag scariness) (xy 0 0)
-      (< mag 1) (xy-random)
+    (if (> mag scariness) (xy 0 0) ; too far away
+      (< mag 1) (xy-random) ; too close
       (normalise away (/ scariness mag)))))
 
 (fn move-away-from-all [me id]
