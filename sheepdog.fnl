@@ -16,6 +16,7 @@
 (fn xy0? [v] (= v.x v.y 0))
 
 (fn magnitude [v]
+  "Return the magnitude of a vector."
   (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
 
 (fn normalise [v mag]
@@ -25,6 +26,7 @@
       (xy* (xy/ v scale) mag))))
 
 (fn xy-random []
+  "Return a random vector with x and y in the range -.5 to .5."
   (xy (- (math.random) .5) (- (math.random) .5)))
 
 ; TIC-80 screen size.
@@ -40,13 +42,15 @@
 ; Incremented on each frame.
 (var t 0)
 
+; Will be updated on draw to the average sheep location.
 (var herd-center (xy 120 60))
+
+; How many to create.
 (var sheep-count 20)
 
-; Tables of entity id => closure.
-; These are called on each frame in this order.
-(var fns-update {}) ; id (fn []) -> action
-(var fns-move-away {}) ; id (fn [from]) -> vector
+; Tables of entity id => closure. All entries in update and draw are called on each frame.
+(var fns-move-away {}) ; id (fn [from]) -> vector to move away from 'from'
+(var fns-update {}) ; id (fn []) -> action vector
 (var fns-draw {}) ; id (fn [])
 
 (macro ++ [n]
@@ -118,18 +122,19 @@
   (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
 (fn stay-in-field [pos vel]
-  "Call after updating pos to keep it in bounds, and stop moving in that direction."
+  "Call after updating pos to keep it in bounds, and stop moving in a bad direction."
   (when (< pos.x 0) (set pos.x 0) (set vel.x 0))
   (when (< pos.y 0) (set pos.y 0) (set vel.y 0))
   (when (> pos.x screen-w-s) (set pos.x screen-w-s) (set vel.x 0))
   (when (> pos.y screen-h-s) (set pos.y screen-h-s) (set vel.y 0)))
 
 (fn move-away [from me scariness]
-  "Return a vector to move away from 'from', scaled by distance and scariness, 0 if too far away."
+  "Return a vector to move away from 'from', scaled by distance and scariness, 0 if too far away.
+  Include some randomness to avoid them getting stuck together."
   (let [away (xy+ (xy* (xy-random) 5) (xy- from me))
         mag (magnitude away)]
     (if (> mag scariness) (xy 0 0)
-      (< mag 1) (xy-random) ; avoid getting stuck together
+      (< mag 1) (xy-random)
       (normalise away (/ scariness mag)))))
 
 (fn move-away-from-all [me id]
@@ -178,11 +183,13 @@
     (when (~= 0 self.scariness)
       (tset fns-move-away self.id
             (fn [from]
+              "Return a vector to move away from this entity."
               (move-away from self.pos self.scariness))))
     
     (when (~= nil update)
       (tset fns-update self.id
             (fn []
+              "Update vel from the action vector returned by update."
               (var action (update self))
               (when (~= action.x 0)
                 (set self.flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
@@ -192,6 +199,7 @@
     
     (tset fns-draw self.id
           (fn []
+            "Update pos from vel, and draw the sprite at pos."
             (set self.pos (xy+ self.pos self.vel))
             (stay-in-field self.pos self.vel)
             (spr (alternate self.sprite self.id)
