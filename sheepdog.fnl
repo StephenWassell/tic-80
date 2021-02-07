@@ -151,7 +151,7 @@
   The caller must provide 3 functions, each in the form (fn [self] ...):
   init: called once when creating the new entity.
   update: called on update, return an action vector. May be nil if it doesn't move.
-  post-draw: called after drawing the sprite at self.pos."
+  post-draw: called after drawing the sprite at self.pos. May be nil."
   (fn []
     (var self {
                :id (unique-id)
@@ -164,6 +164,10 @@
                
                ; Images face left. Set to 1 when moving right to flip the sprite.
                :flip 0
+
+               ; To avoid flipping too rapidly, this is set to the time when we're
+               ; next allowed to change flip.
+               :flip-time 0
                
                ; How fast can it run.
                :accel .15
@@ -173,6 +177,9 @@
                :spr-run 272
                :spr-idle 274
                :sprite spr-idle
+
+               ; Only change to idle sprite after a moment of not moving.
+               :idle-time 0
                
                ; How fast sheep need to run away.
                :scariness 10 } )
@@ -191,10 +198,14 @@
             (fn []
               "Update vel from the action vector returned by update."
               (var action (update self))
-              (when (~= action.x 0)
-                (set self.flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
-              (set self.sprite (if (or (~= action.x 0) (~= action.y 0))
-                                 self.spr-run self.spr-idle))
+              (when (and (~= action.x 0) (> t self.flip-time))
+                (set self.flip (if (> action.x 0) 1 0))
+                ; Don't change flip again for a moment.
+                (set self.flip-time (+ t 10)))
+              (set self.sprite
+                (if (and (xy0? action) (> t self.idle-time)) self.spr-idle self.spr-run))
+              ; Don't use idle sprite until not moving for a moment.
+              (when (not (xy0? action)) (set self.idle-time (+ t 20)))
               (set self.vel (xy* (xy+ self.vel action) self.friction)))))
     
     (tset fns-draw self.id
@@ -205,7 +216,7 @@
             (spr (alternate self.sprite self.id)
                  self.pos.x self.pos.y
                  bg-colour 1 self.flip)
-            (post-draw self)))))
+            (when (~= nil post-draw) (post-draw self))))))
 
 (local new-player (entity-factory
                    ; init
@@ -220,7 +231,7 @@
                       (get-action (center self.pos) self.accel)
                       (normalise (move-away-from-all self.pos self.id) .5)))
                    ; post-draw
-                   (fn [self] nil)))
+                   nil))
 
 (local new-sheep (entity-factory
                   ; init
@@ -231,8 +242,10 @@
                   ; update -> action
                   (fn [self]
                     (var action (move-away-from-all self.pos self.id))
+                    ; If already moving, head towards the center of the herd.
+                    ; todo: only if scared?
                     (when (not (xy0? action))
-                      (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
+                      (set action (xy+ action (normalise (xy- herd-center self.pos) .8))))
                     (normalise action self.accel))
                   ; post-draw
                   (fn [self]
