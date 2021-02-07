@@ -45,9 +45,9 @@
 
 ; Tables of entity id => closure.
 ; These are called on each frame in this order.
-(var fns-update {}) ; id (fn [])
-(var fns-move-away {})
-(var fns-draw {}) ; id { :z z :f (fn []) }
+(var fns-update {}) ; id (fn []) -> action
+(var fns-move-away {}) ; id (fn [from]) -> vector
+(var fns-draw {}) ; id (fn [])
 
 (macro ++ [n]
        "Increment n and return the new value."
@@ -55,34 +55,26 @@
             (set ,n (+ ,n 1))
           ,n))
 
+(fn draw-map []
+    (cls bg-colour))
+
 (global TIC
         (fn tic []
             "The main game loop. On each frame call all updaters then all drawers."
             (each [_ f (pairs fns-update)] (f))
 
+            (draw-map)
+
             (setxy herd-center (xy 0 0))
-            ; todo: will this work? needs to be ipairs?
-            (table.sort fns-draw #(< $1.z $2.z))
-            (each [_ i (pairs fns-draw)] (i.f))
+            (each [_ f (pairs fns-draw)] (f))
             (setxy herd-center (xy/ herd-center sheep-count))
 
             (++ t)))
-
-(fn xy-to-z [c]
-    "Calculate z-index from x and y coords. todo: is 0 fg or bg?"
-    ((+ (* c.y 512) c.x)))
 
 (local unique-id ((fn [] ; Note double ( to call the closure immediately.
                       "Return a closure which increments id and returns the new value. Call in constructors."
                       (var id 0)
                       (fn [] (++ id)))))
-
-(fn new-map []
-    "Create a new map object: draw the background, check for screen edge collisions."
-    (local id (unique-id))
-
-    (tset fns-draw id { :z 0 :f (fn map-draw []
-                                    (cls bg-colour)) } ))
 
 (fn buttons []
     "List of 0/1 for buttons pressed: up down left right"
@@ -187,15 +179,14 @@
                                         self.spr-run self.spr-idle))
                     (set self.vel (xy* (xy+ self.vel action) self.friction)))))
 
-        ; todo: set z
-        (tset fns-draw self.id { :z 1
-            :f (fn []
+        (tset fns-draw self.id
+            (fn []
                 (set self.pos (xy+ self.pos self.vel))
                 (stay-in-field self.pos self.vel)
                 (spr (alternate self.sprite self.id)
                     self.pos.x self.pos.y
                     bg-colour 1 self.flip)
-                (post-draw self)) } )))
+                (post-draw self)))))
 
 (local new-player (entity-factory
     ; init
@@ -229,7 +220,6 @@
         (set herd-center (xy+ herd-center self.pos)))))
 
 ; Create the persistent entities.
-(new-map)
 (new-player)
 (for [_ 1 sheep-count] (new-sheep))
 
