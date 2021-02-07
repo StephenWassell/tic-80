@@ -196,99 +196,174 @@
           (when (~= it id) (setxy action (xy+ action (f me)))))
     action)
 
-(fn new-player []
-    "Create a new player object: respond to keys, draw on the foreground."
-    (local id (unique-id))
+; Return a function which will create an entity when called.
+(macro entity-factory [init move-away update post-draw]
+    `(fn []
+        (local id (unique-id))
+
+        ; Current location, updated in drawer.
+        (var me (xy 0 0))
+
+        ; Current velocity in pixels per frame, updated in updater.
+        (var vel (xy 0 0))
+
+        ; Images face left. Set to 1 when moving right to flip the sprite.
+        (var flip 0)
+
+        ; How fast can it run.
+        (var accel .15)
+        (var friction .9)
+
+        ; Sprite indices, also +1 to each for alternate.
+        (var spr-run 272)
+        (var spr-idle 274)
+        (var sprite spr-idle)
+
+        ; Call the provided initialiser to set the above values if required.
+        ,init
+
+        (tset fns-move-away id (fn [from] ,move-away))
+
+        (tset fns-update id (fn []
+                                (var action (xy 0 0))
+                                ,update
+                                (when (~= action.x 0)
+                                    (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
+                                    (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
+                                    (set vel (xy* (xy+ vel action) friction))))
+
+        ; todo: set z
+        (tset fns-draw id { :z 1 :f (fn []
+                                        (set me (xy+ me vel))
+                                        (stay-in-field me vel)
+                                        (spr (alternate sprite id) me.x me.y bg-colour 1 flip)
+                                        ,post-draw) } )))
+
+(local new-player (entity-factory
+    ; init
+    (do
+        (set me (xy (/ screen-w-s 2) (/ screen-h-s 2)))
+        (set spr-run 272)
+        (set spr-idle 274))
+    ; move-away
+    (move-away from me 50)
+    ; update
+    (set action (xy+
+                    (get-action (center me) accel)
+                    (normalise (move-away-from-all me id) .5)))
+    ; post-draw
+    nil))
+
+; (fn new-player []
+;     "Create a new player object: respond to keys, draw on the foreground."
+;     (local id (unique-id))
   
-    ; Size of the dog. todo: shorter than this
-    ; Current location, updated in drawer.
-    (var me (xy (/ screen-w-s 2) (/ screen-h-s 2)))
+;     ; Size of the dog. todo: shorter than this
+;     ; Current location, updated in drawer.
+;     (var me (xy (/ screen-w-s 2) (/ screen-h-s 2)))
 
-    ; Current velocity in pixels per frame, updated in updater.
-    (var vel (xy 0 0))
+;     ; Current velocity in pixels per frame, updated in updater.
+;     (var vel (xy 0 0))
 
-    ; Images face left. Set to 1 when moving right to flip the sprite.
-    (var flip 0)
+;     ; Images face left. Set to 1 when moving right to flip the sprite.
+;     (var flip 0)
 
-    ; How fast can it run.
-    (local accel .15)
-    (local friction .9)
+;     ; How fast can it run.
+;     (local accel .15)
+;     (local friction .9)
 
-    ; Sprite indices, also +1 to each for alternate.
-    (local spr-run 272)
-    (local spr-idle 274)
-    (var sprite spr-idle)
+;     ; Sprite indices, also +1 to each for alternate.
+;     (local spr-run 272)
+;     (local spr-idle 274)
+;     (var sprite spr-idle)
 
-    ; (set to-player (fn [from] (xy- me from)))
+;     ; (set to-player (fn [from] (xy- me from)))
 
-    (tset fns-move-away id (fn sheep-move-away [from]
-                               (move-away from me 50)))
+;     (tset fns-move-away id (fn sheep-move-away [from]
+;                                (move-away from me 50)))
 
-    (tset fns-update id (fn player-update []
-                            "Update vel based on buttons and mouse, and avoid running over sheep."
-                            (local action (xy+
-                                           (get-action (center me) accel)
-                                           (normalise (move-away-from-all me id) .5)))
+;     (tset fns-update id (fn player-update []
+;                             "Update vel based on buttons and mouse, and avoid running over sheep."
+;                             (local action (xy+
+;                                            (get-action (center me) accel)
+;                                            (normalise (move-away-from-all me id) .5)))
 
-                            (when (~= action.x 0)
-                              (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
-                            (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
-                            (set vel (xy* (xy+ vel action) friction))))
-    ; Check if it would bounce off anything.
-    ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
-    ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
+;                             (when (~= action.x 0)
+;                               (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
+;                             (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
+;                             (set vel (xy* (xy+ vel action) friction))))
+;     ; Check if it would bounce off anything.
+;     ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
+;     ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
 
-    (tset fns-draw id { :z 1 :f (fn player-draw []
-                                    (sprite-draw id me vel sprite flip)) } )
+;     (tset fns-draw id { :z 1 :f (fn player-draw []
+;                                     (sprite-draw id me vel sprite flip)) } )
 
-    ; (tset collides id (fn player-collider [other]
-    ;   (sprite-collider other me))))
-    )
+;     ; (tset collides id (fn player-collider [other]
+;     ;   (sprite-collider other me))))
+;     )
 
-(fn new-sheep []
-    "Create a new sheep object."
-    (local id (unique-id))
+(local new-sheep (entity-factory
+    ; init
+    (do
+        (set me (xy (math.random screen-w-s) (math.random screen-h-s)))
+        (set spr-run 256)
+        (set spr-idle 258))
+    ; move-away
+    (move-away from me 10)
+    ; update
+    (do
+        (set action (move-away-from-all me id))
+        (when (not (xy0? action))
+            (set action (xy+ action (normalise (xy- herd-center me) 1))))
+        (set action (normalise action accel)))
+    ; post-draw
+    (set herd-center (xy+ herd-center me))))
+
+; (fn new-sheep []
+;     "Create a new sheep object."
+;     (local id (unique-id))
   
-    (var me (xy (math.random screen-w-s) (math.random screen-h-s)))
+;     (var me (xy (math.random screen-w-s) (math.random screen-h-s)))
 
-    (var vel (xy 0 0))
-    (var flip 0)
+;     (var vel (xy 0 0))
+;     (var flip 0)
 
-    (local accel .15)
-    (local friction .9)
+;     (local accel .15)
+;     (local friction .9)
 
-    (local spr-run 256)
-    (local spr-idle 258)
-    (var sprite spr-idle)
+;     (local spr-run 256)
+;     (local spr-idle 258)
+;     (var sprite spr-idle)
 
-    (tset fns-move-away id (fn sheep-move-away [from]
-                               (move-away from me 10)))
+;     (tset fns-move-away id (fn sheep-move-away [from]
+;                                (move-away from me 10)))
 
-    (tset fns-update id (fn sheep-update []
-                            "Escape player and todo: go towards flock"
-                            ; (local tp (to-player me))
-                            ; (local action (normalise tp (- 0 accel))) ; escape player
+;     (tset fns-update id (fn sheep-update []
+;                             "Escape player and todo: go towards flock"
+;                             ; (local tp (to-player me))
+;                             ; (local action (normalise tp (- 0 accel))) ; escape player
 
-                            (var action (move-away-from-all me id))
-                            (when (not (xy0? action))
-                              (setxy action (xy+ action (normalise (xy- herd-center me) 1))))
-                            (setxy action (normalise action accel))
+;                             (var action (move-away-from-all me id))
+;                             (when (not (xy0? action))
+;                               (setxy action (xy+ action (normalise (xy- herd-center me) 1))))
+;                             (setxy action (normalise action accel))
 
-                            (when (~= action.x 0)
-                              (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
-                            (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
-                            (set vel (xy (* friction (+ vel.x action.x)) (* friction (+ vel.y action.y))))))
-    ; Check if it would bounce off anything.
-    ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
-    ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
+;                             (when (~= action.x 0)
+;                               (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
+;                             (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
+;                             (set vel (xy (* friction (+ vel.x action.x)) (* friction (+ vel.y action.y))))))
+;     ; Check if it would bounce off anything.
+;     ; (local mult (any-collides (xywh (+ me.x vel.x) (+ me.y vel.y) me.w me.h) id))
+;     ; (set vel (xy (* vel.x mult.x) (* vel.y mult.y)))))
 
-    (tset fns-draw id { :z 1 :f (fn sheep-draw []
-                                    (sprite-draw id me vel sprite flip)
-                                    (setxy herd-center (xy+ herd-center me))) } )
+;     (tset fns-draw id { :z 1 :f (fn sheep-draw []
+;                                     (sprite-draw id me vel sprite flip)
+;                                     (setxy herd-center (xy+ herd-center me))) } )
 
-    ; (tset collides id (fn sheep-collider [other]
-    ;   (sprite-collider other me))))
-    )
+;     ; (tset collides id (fn sheep-collider [other]
+;     ;   (sprite-collider other me))))
+;     )
 
 ; Create the persistent entities.
 (new-map)
