@@ -6,8 +6,8 @@
 (macro xy [x y] `{:x ,x :y ,y})
 
 (fn setxy [dst src]
-    (set dst.x src.x)
-    (set dst.y src.y))
+  (set dst.x src.x)
+  (set dst.y src.y))
 
 (fn xy* [v m] (xy (* v.x m) (* v.y m)))
 (fn xy/ [v d] (xy (/ v.x d) (/ v.y d)))
@@ -16,16 +16,16 @@
 (fn xy0? [v] (= v.x v.y 0))
 
 (fn magnitude [v]
-    (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
+  (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
 
 (fn normalise [v mag]
-    "Normalise vector to a given magnitude."
-    (let [scale (magnitude v)]
-      (if (< scale .1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
-          (xy* (xy/ v scale) mag))))
+  "Normalise vector to a given magnitude."
+  (let [scale (magnitude v)]
+    (if (< scale .1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
+      (xy* (xy/ v scale) mag))))
 
 (fn xy-random []
-    (xy (- (math.random) .5) (- (math.random) .5)))
+  (xy (- (math.random) .5) (- (math.random) .5)))
 
 ; TIC-80 screen size.
 (local screen-w 240)
@@ -52,172 +52,183 @@
 (macro ++ [n]
        "Increment n and return the new value."
        `(do
-            (set ,n (+ ,n 1))
+          (set ,n (+ ,n 1))
           ,n))
 
 (fn draw-map []
-    (cls bg-colour))
+  (cls bg-colour))
 
 (global TIC
         (fn tic []
-            "The main game loop. On each frame call all updaters then all drawers."
-            (each [_ f (pairs fns-update)] (f))
-
-            (draw-map)
-
-            (setxy herd-center (xy 0 0))
-            (each [_ f (pairs fns-draw)] (f))
-            (setxy herd-center (xy/ herd-center sheep-count))
-
-            (++ t)))
+          "The main game loop. On each frame call all updaters then all drawers."
+          (each [_ f (pairs fns-update)] (f))
+          
+          (draw-map)
+          
+          (setxy herd-center (xy 0 0))
+          (each [_ f (pairs fns-draw)] (f))
+          (setxy herd-center (xy/ herd-center sheep-count))
+          
+          (++ t)))
 
 (local unique-id ((fn [] ; Note double ( to call the closure immediately.
-                      "Return a closure which increments id and returns the new value. Call in constructors."
-                      (var id 0)
-                      (fn [] (++ id)))))
+                    "Return a closure which increments id and returns the new value. Call in constructors."
+                    (var id 0)
+                    (fn [] (++ id)))))
 
 (fn buttons []
-    "List of 0/1 for buttons pressed: up down left right"
-    (values
-     (if (btn 0) 1 0)
-     (if (btn 1) 1 0)
-     (if (btn 2) 1 0)
-     (if (btn 3) 1 0)))
+  "List of 0/1 for buttons pressed: up down left right"
+  (values
+   (if (btn 0) 1 0)
+   (if (btn 1) 1 0)
+   (if (btn 2) 1 0)
+   (if (btn 3) 1 0)))
 
 (fn to-mouse [from]
-    "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
-    (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
-    (if (or left middle right) (xy (- mouse-x from.x) (- mouse-y from.y))
-        (xy 0 0)))
+  "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
+  (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
+  (if (or left middle right) (xy (- mouse-x from.x) (- mouse-y from.y))
+    (xy 0 0)))
 
 (fn get-action [from accel]
-    "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
-    (let [dir (match (buttons)
-                ; up down left right
-                (1 0 0 0) (xy 0 -1)
-                (0 1 0 0) (xy 0 1)
-                (0 0 1 0) (xy -1 0)
-                (0 0 0 1) (xy 1 0)
-                (1 0 1 0) (xy -1 -1)
-                (1 0 0 1) (xy 1 -1)
-                (0 1 1 0) (xy -1 1)
-                (0 1 0 1) (xy 1 1)
-                _ (to-mouse from))] ; No buttons pressed, go towards mouse.
-      (normalise dir accel)))
+  "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
+  (let [dir (match (buttons)
+                   ; up down left right
+                   (1 0 0 0) (xy 0 -1)
+                   (0 1 0 0) (xy 0 1)
+                   (0 0 1 0) (xy -1 0)
+                   (0 0 0 1) (xy 1 0)
+                   (1 0 1 0) (xy -1 -1)
+                   (1 0 0 1) (xy 1 -1)
+                   (0 1 1 0) (xy -1 1)
+                   (0 1 0 1) (xy 1 1)
+                   _ (to-mouse from))] ; No buttons pressed, go towards mouse.
+    (normalise dir accel)))
 
-(fn center [me]
-    "The center of a sprite given x y w h."
-    (xy (+ me.x 4) (+ me.y 4)))
+(fn center [pos]
+  "The center of a sprite."
+  (xy (+ pos.x 4) (+ pos.y 4)))
 
 (fn alternate [s id]
-    "Alternate between s and s+1 for running feet and wagging tails."
-    (+ s (/ (% (+ t (* id 10)) 24) 12)))
+  "Alternate between s and s+1 for running feet and wagging tails."
+  (+ s (/ (% (+ t (* id 10)) 24) 12)))
 
 (fn moving [d]
-    "True if we need the sprite for moving, given pixels per frame."
-    (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
+  "True if we need the sprite for moving, given pixels per frame."
+  (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
-(fn stay-in-field [me vel]
-    (when (< me.x 0) (set me.x 0) (set vel.x 0))
-    (when (< me.y 0) (set me.y 0) (set vel.y 0))
-    (when (> me.x screen-w-s) (set me.x screen-w-s) (set vel.x 0))
-    (when (> me.y screen-h-s) (set me.y screen-h-s) (set vel.y 0)))
+(fn stay-in-field [pos vel]
+  "Call after updating pos to keep it in bounds, and stop moving in that direction."
+  (when (< pos.x 0) (set pos.x 0) (set vel.x 0))
+  (when (< pos.y 0) (set pos.y 0) (set vel.y 0))
+  (when (> pos.x screen-w-s) (set pos.x screen-w-s) (set vel.x 0))
+  (when (> pos.y screen-h-s) (set pos.y screen-h-s) (set vel.y 0)))
 
-(fn move-away [from me strength]
-    (let [away (xy+ (xy* (xy-random) 5) (xy- from me))
-               mag (magnitude away)]
-      (if (> mag strength) (xy 0 0)
-          (< mag 1) (xy-random) ; todo: still getting stuck together
-          (normalise away (/ strength mag)))))
+(fn move-away [from me scariness]
+  "Return a vector to move away from 'from', scaled by distance and scariness, 0 if too far away."
+  (let [away (xy+ (xy* (xy-random) 5) (xy- from me))
+        mag (magnitude away)]
+    (if (> mag scariness) (xy 0 0)
+      (< mag 1) (xy-random) ; avoid getting stuck together
+      (normalise away (/ scariness mag)))))
 
 (fn move-away-from-all [me id]
-    (var action (xy 0 0))
-    (each [it f (pairs fns-move-away)]
-          (when (~= it id) (setxy action (xy+ action (f me)))))
-    action)
+  "Sum the move-away vectors for all nearby entities."
+  (var action (xy 0 0))
+  (each [it f (pairs fns-move-away)]
+        (when (~= it id) (setxy action (xy+ action (f me)))))
+  action)
 
-; Return a function which will create an entity when called.
 (fn entity-factory [init update post-draw]
-    (fn []
-        (var self {
-            :id (unique-id)
+  "Return a function which will create an entity when called.
+  Adds a closure to each of the fns- tables defined above.
 
-            ; Current location, updated in drawer.
-            :pos (xy 0 0)
-
-            ; Current velocity in pixels per frame, updated in updater.
-            :vel (xy 0 0)
-
-            ; Images face left. Set to 1 when moving right to flip the sprite.
-            :flip 0
-
-            ; How fast can it run.
-            :accel .15
-            :friction .9
-
-            ; Sprite indices, also +1 to each for alternate.
-            :spr-run 272
-            :spr-idle 274
-            :sprite spr-idle
-            
-            ; How fast sheep need to run away.
-            :scariness 10})
-
-        ; Call the provided initialiser to set the above values if required.
-        (init self)
-
-        (when (~= 0 self.scariness) (tset fns-move-away self.id
+  The caller must provide 3 functions, each in the form (fn [self] ...):
+  init: called once when creating the new entity.
+  update: called on update, return an action vector. May be nil if it doesn't move.
+  post-draw: called after drawing the sprite at self.pos."
+  (fn []
+    (var self {
+               :id (unique-id)
+               
+               ; Current location, updated in drawer.
+               :pos (xy 0 0)
+               
+               ; Current velocity in pixels per frame, updated in updater.
+               :vel (xy 0 0)
+               
+               ; Images face left. Set to 1 when moving right to flip the sprite.
+               :flip 0
+               
+               ; How fast can it run.
+               :accel .15
+               :friction .9
+               
+               ; Sprite indices, also +1 to each for alternate.
+               :spr-run 272
+               :spr-idle 274
+               :sprite spr-idle
+               
+               ; How fast sheep need to run away.
+               :scariness 10 } )
+    
+    ; Call the provided initialiser to set the above values if required.
+    (init self)
+    
+    (when (~= 0 self.scariness)
+      (tset fns-move-away self.id
             (fn [from]
-                (move-away from self.pos self.scariness))))
-
-        (when (~= nil update) (tset fns-update self.id
+              (move-away from self.pos self.scariness))))
+    
+    (when (~= nil update)
+      (tset fns-update self.id
             (fn []
-                (var action (update self))
-                (when (~= action.x 0)
-                    (set self.flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
-                    (set self.sprite (if (or (~= action.x 0) (~= action.y 0))
-                                        self.spr-run self.spr-idle))
-                    (set self.vel (xy* (xy+ self.vel action) self.friction)))))
-
-        (tset fns-draw self.id
-            (fn []
-                (set self.pos (xy+ self.pos self.vel))
-                (stay-in-field self.pos self.vel)
-                (spr (alternate self.sprite self.id)
-                    self.pos.x self.pos.y
-                    bg-colour 1 self.flip)
-                (post-draw self)))))
+              (var action (update self))
+              (when (~= action.x 0)
+                (set self.flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
+              (set self.sprite (if (or (~= action.x 0) (~= action.y 0))
+                                 self.spr-run self.spr-idle))
+              (set self.vel (xy* (xy+ self.vel action) self.friction)))))
+    
+    (tset fns-draw self.id
+          (fn []
+            (set self.pos (xy+ self.pos self.vel))
+            (stay-in-field self.pos self.vel)
+            (spr (alternate self.sprite self.id)
+                 self.pos.x self.pos.y
+                 bg-colour 1 self.flip)
+            (post-draw self)))))
 
 (local new-player (entity-factory
-    ; init
-    (fn [self]
-        (set self.pos (xy (/ screen-w-s 2) (/ screen-h-s 2)))
-        (set self.spr-run 272)
-        (set self.spr-idle 274)
-        (set self.scariness 50))
-    ; update -> action
-    (fn [self]
-        (xy+
-            (get-action (center self.pos) self.accel)
-            (normalise (move-away-from-all self.pos self.id) .5)))
-    ; post-draw
-    (fn [self] nil)))
+                   ; init
+                   (fn [self]
+                     (set self.pos (xy (/ screen-w-s 2) (/ screen-h-s 2)))
+                     (set self.spr-run 272)
+                     (set self.spr-idle 274)
+                     (set self.scariness 50))
+                   ; update -> action
+                   (fn [self]
+                     (xy+
+                      (get-action (center self.pos) self.accel)
+                      (normalise (move-away-from-all self.pos self.id) .5)))
+                   ; post-draw
+                   (fn [self] nil)))
 
 (local new-sheep (entity-factory
-    ; init
-    (fn [self]
-        (set self.pos (xy (math.random screen-w-s) (math.random screen-h-s)))
-        (set self.spr-run 256)
-        (set self.spr-idle 258))
-    ; update -> action
-    (fn [self]
-        (var action (move-away-from-all self.pos self.id))
-        (when (not (xy0? action))
-            (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
-        (normalise action self.accel))
-    ; post-draw
-    (fn [self]
-        (set herd-center (xy+ herd-center self.pos)))))
+                  ; init
+                  (fn [self]
+                    (set self.pos (xy (math.random screen-w-s) (math.random screen-h-s)))
+                    (set self.spr-run 256)
+                    (set self.spr-idle 258))
+                  ; update -> action
+                  (fn [self]
+                    (var action (move-away-from-all self.pos self.id))
+                    (when (not (xy0? action))
+                      (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
+                    (normalise action self.accel))
+                  ; post-draw
+                  (fn [self]
+                    (set herd-center (xy+ herd-center self.pos)))))
 
 ; Create the persistent entities.
 (new-player)
