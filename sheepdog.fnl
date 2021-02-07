@@ -197,62 +197,72 @@
     action)
 
 ; Return a function which will create an entity when called.
-(macro entity-factory [init move-away update post-draw]
-    `(fn []
-        (local id (unique-id))
+(fn entity-factory [init update post-draw]
+    (fn []
+        (var self {
+            :id (unique-id)
 
-        ; Current location, updated in drawer.
-        (var me (xy 0 0))
+            ; Current location, updated in drawer.
+            :pos (xy 0 0)
 
-        ; Current velocity in pixels per frame, updated in updater.
-        (var vel (xy 0 0))
+            ; Current velocity in pixels per frame, updated in updater.
+            :vel (xy 0 0)
 
-        ; Images face left. Set to 1 when moving right to flip the sprite.
-        (var flip 0)
+            ; Images face left. Set to 1 when moving right to flip the sprite.
+            :flip 0
 
-        ; How fast can it run.
-        (var accel .15)
-        (var friction .9)
+            ; How fast can it run.
+            :accel .15
+            :friction .9
 
-        ; Sprite indices, also +1 to each for alternate.
-        (var spr-run 272)
-        (var spr-idle 274)
-        (var sprite spr-idle)
+            ; Sprite indices, also +1 to each for alternate.
+            :spr-run 272
+            :spr-idle 274
+            :sprite spr-idle
+            
+            ; How fast sheep need to run away.
+            :scariness 10})
 
         ; Call the provided initialiser to set the above values if required.
-        ,init
+        (init self)
 
-        (tset fns-move-away id (fn [from] ,move-away))
+        (when (~= 0 self.scariness) (tset fns-move-away self.id
+            (fn [from]
+                (move-away from self.pos self.scariness))))
 
-        (tset fns-update id (fn []
-                                (var action (xy 0 0))
-                                ,update
-                                (when (~= action.x 0)
-                                    (set flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
-                                    (set sprite (if (or (~= action.x 0) (~= action.y 0)) spr-run spr-idle))
-                                    (set vel (xy* (xy+ vel action) friction))))
+        (when (~= nil update) (tset fns-update self.id
+            (fn []
+                (var action (update self))
+                (when (~= action.x 0)
+                    (set self.flip (if (> action.x 0) 1 0))) ; Use ax not dx to avoid wiggling.
+                    (set self.sprite (if (or (~= action.x 0) (~= action.y 0))
+                                        self.spr-run self.spr-idle))
+                    (set self.vel (xy* (xy+ self.vel action) self.friction)))))
 
         ; todo: set z
-        (tset fns-draw id { :z 1 :f (fn []
-                                        (set me (xy+ me vel))
-                                        (stay-in-field me vel)
-                                        (spr (alternate sprite id) me.x me.y bg-colour 1 flip)
-                                        ,post-draw) } )))
+        (tset fns-draw self.id { :z 1
+            :f (fn []
+                (set self.pos (xy+ self.pos self.vel))
+                (stay-in-field self.pos self.vel)
+                (spr (alternate self.sprite self.id)
+                    self.pos.x self.pos.y
+                    bg-colour 1 self.flip)
+                (post-draw self)) } )))
 
 (local new-player (entity-factory
     ; init
-    (do
-        (set me (xy (/ screen-w-s 2) (/ screen-h-s 2)))
-        (set spr-run 272)
-        (set spr-idle 274))
-    ; move-away
-    (move-away from me 50)
-    ; update
-    (set action (xy+
-                    (get-action (center me) accel)
-                    (normalise (move-away-from-all me id) .5)))
+    (fn [self]
+        (set self.pos (xy (/ screen-w-s 2) (/ screen-h-s 2)))
+        (set self.spr-run 272)
+        (set self.spr-idle 274)
+        (set self.scariness 50))
+    ; update -> action
+    (fn [self]
+        (xy+
+            (get-action (center self.pos) self.accel)
+            (normalise (move-away-from-all self.pos self.id) .5)))
     ; post-draw
-    nil))
+    (fn [self] nil)))
 
 ; (fn new-player []
 ;     "Create a new player object: respond to keys, draw on the foreground."
@@ -305,20 +315,19 @@
 
 (local new-sheep (entity-factory
     ; init
-    (do
-        (set me (xy (math.random screen-w-s) (math.random screen-h-s)))
-        (set spr-run 256)
-        (set spr-idle 258))
-    ; move-away
-    (move-away from me 10)
-    ; update
-    (do
-        (set action (move-away-from-all me id))
+    (fn [self]
+        (set self.pos (xy (math.random screen-w-s) (math.random screen-h-s)))
+        (set self.spr-run 256)
+        (set self.spr-idle 258))
+    ; update -> action
+    (fn [self]
+        (var action (move-away-from-all self.pos self.id))
         (when (not (xy0? action))
-            (set action (xy+ action (normalise (xy- herd-center me) 1))))
-        (set action (normalise action accel)))
+            (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
+        (normalise action self.accel))
     ; post-draw
-    (set herd-center (xy+ herd-center me))))
+    (fn [self]
+        (set herd-center (xy+ herd-center self.pos)))))
 
 ; (fn new-sheep []
 ;     "Create a new sheep object."
