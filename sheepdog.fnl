@@ -48,6 +48,9 @@
 ; How many to create.
 (var sheep-count 20)
 
+; Will set to the player entity's id.
+(var player-id nil)
+
 ; Tables of entity id => closure. All entries in update and draw are called on each frame.
 (var fns-move-away {}) ; id (fn [from]) -> vector to move away from 'from'
 (var fns-update {}) ; id (fn []) -> action vector
@@ -140,11 +143,16 @@
 (fn move-away-from-all [me id]
   "Sum the move-away vectors for all nearby entities."
   (var action (xy 0 0))
+  (var scared false)
   (each [it f (pairs fns-move-away)]
-        (when (~= it id) (setxy action (xy+ action (f me)))))
-  action)
+        (when (~= it id) ; it's not me
+          (let [vec (f me)] ; move away from it by this vector
+            (when (not (xy0? vec)) ; close enough to move away from
+              (set action (xy+ action (f me)))
+              (when (= it player-id) (set scared true))))))
+  (values action scared))
 
-(fn entity-factory [init update post-draw]
+(fn entity-template [init update post-draw]
   "Return a function which will create an entity when called.
   Adds a closure to each of the fns- tables defined above.
 
@@ -164,7 +172,7 @@
                
                ; Images face left. Set to 1 when moving right to flip the sprite.
                :flip 0
-
+               
                ; To avoid flipping too rapidly, this is set to the time when we're
                ; next allowed to change flip.
                :flip-time 0
@@ -177,7 +185,7 @@
                :spr-run 272
                :spr-idle 274
                :sprite spr-idle
-
+               
                ; Only change to idle sprite after a moment of not moving.
                :idle-time 0
                
@@ -203,7 +211,7 @@
                 ; Don't change flip again for a moment.
                 (set self.flip-time (+ t 10)))
               (set self.sprite
-                (if (and (xy0? action) (> t self.idle-time)) self.spr-idle self.spr-run))
+                   (if (and (xy0? action) (> t self.idle-time)) self.spr-idle self.spr-run))
               ; Don't use idle sprite until not moving for a moment.
               (when (not (xy0? action)) (set self.idle-time (+ t 20)))
               (set self.vel (xy* (xy+ self.vel action) self.friction)))))
@@ -218,22 +226,24 @@
                  bg-colour 1 self.flip)
             (when (~= nil post-draw) (post-draw self))))))
 
-(local new-player (entity-factory
+(local new-player (entity-template
                    ; init
                    (fn [self]
                      (set self.pos (xy (/ screen-w-s 2) (/ screen-h-s 2)))
                      (set self.spr-run 272)
                      (set self.spr-idle 274)
-                     (set self.scariness 50))
+                     (set self.scariness 50)
+                     (set player-id self.id))
                    ; update -> action
                    (fn [self]
+                     (var (action scared) (move-away-from-all self.pos self.id))
                      (xy+
                       (get-action (center self.pos) self.accel)
-                      (normalise (move-away-from-all self.pos self.id) .5)))
+                      (normalise action .5)))
                    ; post-draw
                    nil))
 
-(local new-sheep (entity-factory
+(local new-sheep (entity-template
                   ; init
                   (fn [self]
                     (set self.pos (xy (math.random screen-w-s) (math.random screen-h-s)))
@@ -241,11 +251,10 @@
                     (set self.spr-idle 258))
                   ; update -> action
                   (fn [self]
-                    (var action (move-away-from-all self.pos self.id))
-                    ; If already moving, head towards the center of the herd.
-                    ; todo: only if scared?
-                    (when (not (xy0? action))
-                      (set action (xy+ action (normalise (xy- herd-center self.pos) .8))))
+                    (var (action scared) (move-away-from-all self.pos self.id))
+                    ; If moving away from player, head towards the center of the herd.
+                    (when scared
+                      (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
                     (normalise action self.accel))
                   ; post-draw
                   (fn [self]
