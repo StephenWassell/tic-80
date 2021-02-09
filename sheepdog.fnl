@@ -5,9 +5,9 @@
 
 (macro xy [x y] `{:x ,x :y ,y})
 
-(fn setxy [dst src]
-  (set dst.x src.x)
-  (set dst.y src.y))
+;; (fn setxy [dst src]
+;;   (set dst.x src.x)
+;;   (set dst.y src.y))
 
 (fn xy* [v m] (xy (* v.x m) (* v.y m)))
 (fn xy/ [v d] (xy (/ v.x d) (/ v.y d)))
@@ -62,6 +62,11 @@
           (set ,n (+ ,n 1))
           ,n))
 
+(macro *= [a b]
+       `(do
+          (set ,a (* ,a ,b))
+          ,a))
+
 (fn draw-map []
   (cls bg-colour))
 
@@ -72,9 +77,9 @@
           
           (draw-map)
           
-          (setxy herd-center (xy 0 0))
+          (set herd-center (xy 0 0))
           (each [_ f (pairs fns-draw)] (f))
-          (setxy herd-center (xy/ herd-center sheep-count))
+          (set herd-center (xy/ herd-center sheep-count))
           
           (++ t)))
 
@@ -125,11 +130,9 @@
   (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
 (fn stay-in-field [pos vel]
-  "Call after updating pos to keep it in bounds, and stop moving in a bad direction."
-  (when (< pos.x 0) (set pos.x 0) (set vel.x 0))
-  (when (< pos.y 0) (set pos.y 0) (set vel.y 0))
-  (when (> pos.x screen-w-s) (set pos.x screen-w-s) (set vel.x 0))
-  (when (> pos.y screen-h-s) (set pos.y screen-h-s) (set vel.y 0)))
+  "Call before updating pos to keep it in bounds."
+  (when (or (< pos.x 0) (> pos.x screen-w-s)) (*= vel.x -1.5))
+  (when (or (< pos.y 0) (> pos.y screen-h-s)) (*= vel.y -1.5)))
 
 (fn move-away [from me scariness]
   "Return a vector to move away from 'from', scaled by distance and scariness, 0 if too far away.
@@ -219,8 +222,8 @@
     (tset fns-draw self.id
           (fn []
             "Update pos from vel, and draw the sprite at pos."
-            (set self.pos (xy+ self.pos self.vel))
             (stay-in-field self.pos self.vel)
+            (set self.pos (xy+ self.pos self.vel))
             (spr (alternate self.sprite self.id)
                  self.pos.x self.pos.y
                  bg-colour 1 self.flip)
