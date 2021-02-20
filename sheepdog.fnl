@@ -48,8 +48,8 @@
 ; How many to create.
 (var sheep-count 20)
 
-; Will set to the player entity's id.
-(var player-id nil)
+; Set of ids of things that scare the sheep - eg player.
+(var scary-ids {})
 
 ; Tables of entity id => closure. All entries in update and draw are called on each frame.
 (var fns-move-away {}) ; id (fn [from]) -> vector to move away from 'from'
@@ -152,7 +152,7 @@
           (let [vec (f me)] ; move away from it by this vector
             (when (not (xy0? vec)) ; close enough to move away from
               (set action (xy+ action (f me)))
-              (when (= it player-id) (set scared true))))))
+              (when (. scary-ids it) (set scared true))))))
   (values action scared))
 
 (fn entity-template [init update post-draw]
@@ -236,7 +236,7 @@
                      (set self.spr-run 272)
                      (set self.spr-idle 274)
                      (set self.scariness 50)
-                     (set player-id self.id))
+                     (tset scary-ids self.id 1))
                    ; update -> action
                    (fn [self]
                      (var (action scared) (move-away-from-all self.pos self.id))
