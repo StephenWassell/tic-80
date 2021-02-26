@@ -1,41 +1,13 @@
-;; title:  Sheepdog
+;; title:  One Man And His Dog
 ;; author: Stephen Wassell
 ;; desc:   Art by u/please_send_cookies
 ;; script: fennel
 
-(macro xy [x y] `{:x ,x :y ,y})
+(macro xy [x y]
+  "Create a new vector. Vectors are tables containing :x and :y values."
+  `{:x ,x :y ,y})
 
-;; (fn setxy [dst src]
-;;   (set dst.x src.x)
-;;   (set dst.y src.y))
-
-(fn xy* [v m] (xy (* v.x m) (* v.y m)))
-(fn xy/ [v d] (xy (/ v.x d) (/ v.y d)))
-(fn xy+ [a b] (xy (+ a.x b.x) (+ a.y b.y)))
-(fn xy- [a b] (xy (- a.x b.x) (- a.y b.y)))
-(fn xy0? [v] (= v.x v.y 0))
-
-(fn magnitude [v]
-  "Return the magnitude of a vector."
-  (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
-
-(fn normalise [v mag]
-  "Normalise vector to a given magnitude."
-  (let [scale (magnitude v)]
-    (if (< scale .1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
-      (xy* (xy/ v scale) mag))))
-
-(fn xy-random []
-  "Return a random vector with x and y in the range -.5 to .5."
-  (xy (- (math.random) .5) (- (math.random) .5)))
-
-(fn pick-random [array]
-  "Return a randomly selected item from the provided array."
-  (. array (math.random (length array))))
-
-(fn random0 [max]
-  "Return a random number in the range 0 <= n < max."
-  (- (math.random max) 1))
+; Constants and globals.
 
 ; TIC-80 screen size.
 (local screen-w 240)
@@ -64,6 +36,8 @@
 (var fns-update {}) ; id (fn []) -> action vector
 (var fns-draw {}) ; id (fn [])
 
+; Some utility functions.
+
 (macro ++ [n]
        "Increment n and return the new value."
        `(do
@@ -75,6 +49,61 @@
        `(do
           (set ,a (* ,a ,b))
           ,a))
+
+(local unique-id ((fn [] ; Note double ( to call the closure immediately.
+                    "Return a closure which increments id and returns the new value. Call in constructors."
+                    (var id 0)
+                    (fn [] (++ id)))))
+
+; Vector arithmetic.
+
+(fn xy* [v m]
+  "Return a vector with both values multiplied by a scalar."
+  (xy (* v.x m) (* v.y m)))
+
+(fn xy/ [v d]
+  "Return a vector with both values divided by a scalar."
+  (xy (/ v.x d) (/ v.y d)))
+
+(fn xy+ [a b]
+  "Add two vectors."
+  (xy (+ a.x b.x) (+ a.y b.y)))
+
+(fn xy- [a b]
+  "Subtract two vectors."
+  (xy (- a.x b.x) (- a.y b.y)))
+
+(fn xy0? [v]
+  "Return true if both values are 0."
+  (= v.x v.y 0))
+
+(fn magnitude [v]
+  "Return the magnitude of a vector."
+  (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
+
+(fn normalise [v mag]
+  "Normalise vector to a given magnitude."
+  (let [scale (magnitude v)]
+    (if (< scale .1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
+      (xy* (xy/ v scale) mag))))
+
+(fn center [pos]
+  "The center of an 8x8 sprite."
+  (xy (+ pos.x 4) (+ pos.y 4)))
+
+; Some functions to return random values.
+
+(fn xy-random []
+  "Return a random vector with x and y in the range -.5 to .5."
+  (xy (- (math.random) .5) (- (math.random) .5)))
+
+(fn pick-random [array]
+  "Return a randomly selected item from the provided array."
+  (. array (math.random (length array))))
+
+(fn random0 [max]
+  "Return a random number in the range 0 <= n < max."
+  (- (math.random max) 1))
 
 ; Will be set by construct-map to a closure.
 (var draw-map nil)
@@ -107,10 +136,7 @@
           
           (++ t)))
 
-(local unique-id ((fn [] ; Note double ( to call the closure immediately.
-                    "Return a closure which increments id and returns the new value. Call in constructors."
-                    (var id 0)
-                    (fn [] (++ id)))))
+; Input handling.
 
 (fn buttons []
   "List of 0/1 for buttons pressed: up down left right"
@@ -141,9 +167,7 @@
                    _ (to-mouse from))] ; No buttons pressed, go towards mouse.
     (normalise dir accel)))
 
-(fn center [pos]
-  "The center of a sprite."
-  (xy (+ pos.x 4) (+ pos.y 4)))
+; Sprite selection.
 
 (fn alternate [s id]
   "Alternate between s and s+1 for running feet and wagging tails."
@@ -153,13 +177,19 @@
   "True if we need the sprite for moving, given pixels per frame."
   (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
+; Collision detection. The hard field boundary and soft collisions with other sprites
+; handled differently.
+
+; todo: how to deal with fences etc?
+
 (fn stay-in-field [pos vel]
-  "Call after updating pos to keep it in bounds, and stop moving in a bad direction."
+  "Call after updating pos to keep it in bounds, and stop moving in a bad direction.
+  This is a hard collision."
   (when (< pos.x 0) (set pos.x 0) (set vel.x 0))
   (when (< pos.y 0) (set pos.y 0) (set vel.y 0))
   (when (> pos.x screen-w-s) (set pos.x screen-w-s) (set vel.x 0))
   (when (> pos.y screen-h-s) (set pos.y screen-h-s) (set vel.y 0)))
-;; "Call before updating pos to keep it in bounds."
+;; Not such a good method, simpler but too bouncy.
 ;; (when (or (< pos.x 0) (> pos.x screen-w-s)) (*= vel.x -1.5))
 ;; (when (or (< pos.y 0) (> pos.y screen-h-s)) (*= vel.y -1.5)))
 
@@ -183,6 +213,8 @@
               (set action (xy+ action (f me)))
               (when (. scary-ids it) (set scared true))))))
   (values action scared))
+
+; Creating game entities (is that the right word for how I've done it here?).
 
 (fn entity-template [init update post-draw]
   "Return a function which will create an entity when called.
@@ -221,18 +253,21 @@
                ; Only change to idle sprite after a moment of not moving.
                :idle-time 0
                
-               ; How fast sheep need to run away.
+               ; How fast sheep need to run away from this entity.
+               ; This is right for a sheep; increase for a dog.
                :scariness 10 } )
     
-    ; Call the provided initialiser to set the above values if required.
+    ; Call the provided initialiser to change any of the above values.
     (init self)
     
+    ; Add a closure to fns-move-away if this is a solid object.
     (when (~= 0 self.scariness)
       (tset fns-move-away self.id
             (fn [from]
               "Return a vector to move away from this entity."
               (move-away from self.pos self.scariness))))
     
+    ; Optionally add a closure to fns-update.
     (when (~= nil update)
       (tset fns-update self.id
             (fn []
@@ -248,6 +283,7 @@
               (when (not (xy0? action)) (set self.idle-time (+ t 20)))
               (set self.vel (xy* (xy+ self.vel action) self.friction)))))
     
+    ; Always add a closure to fns-draw.
     (tset fns-draw self.id
           (fn []
             "Update pos from vel, and draw the sprite at pos."
