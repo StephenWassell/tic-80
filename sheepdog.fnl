@@ -29,6 +29,14 @@
   "Return a random vector with x and y in the range -.5 to .5."
   (xy (- (math.random) .5) (- (math.random) .5)))
 
+(fn pick-random [array]
+  "Return a randomly selected item from the provided array."
+  (. array (math.random (length array))))
+
+(fn random0 [max]
+  "Return a random number in the range 0 <= n < max."
+  (- (math.random max) 1))
+
 ; TIC-80 screen size.
 (local screen-w 240)
 (local screen-h 136)
@@ -69,8 +77,18 @@
 
 (var draw-map nil)
 
-((fn []
-   "Initialise the map and its methods."
+((fn construct-map []
+   "Called immediately to initialise the map and its methods."
+   ; These sprites are decorations to be applied randomly to the map.
+   (local decorations [21 34 146 81 87 117])
+   ; Decorate empty areas of the map.
+   (for [i 0 20]
+    (local x (random0 30))
+    (local y (random0 17))
+    (when (= 0 (mget x y)) (mset x y (pick-random decorations))))
+   
+   ; todo: fill up the map
+   ;(for [i 0 30] (for [j 0 17] (mset i j 21)))
    (set draw-map (fn [] (map)))))
 
 (global TIC
