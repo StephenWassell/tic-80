@@ -85,9 +85,9 @@
    (local decorations [21 34 146 81 87 117])
    ; Decorate empty areas of the map.
    (for [i 0 20]
-    (local x (random0 30))
-    (local y (random0 17))
-    (when (= 0 (mget x y)) (mset x y (pick-random decorations))))
+     (local x (random0 30))
+     (local y (random0 17))
+     (when (= 0 (mget x y)) (mset x y (pick-random decorations))))
    
    (set draw-map (fn [] (map)))))
 
@@ -154,9 +154,14 @@
   (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
 (fn stay-in-field [pos vel]
-  "Call before updating pos to keep it in bounds."
-  (when (or (< pos.x 0) (> pos.x screen-w-s)) (*= vel.x -1.5))
-  (when (or (< pos.y 0) (> pos.y screen-h-s)) (*= vel.y -1.5)))
+  "Call after updating pos to keep it in bounds, and stop moving in a bad direction."
+  (when (< pos.x 0) (set pos.x 0) (set vel.x 0))
+  (when (< pos.y 0) (set pos.y 0) (set vel.y 0))
+  (when (> pos.x screen-w-s) (set pos.x screen-w-s) (set vel.x 0))
+  (when (> pos.y screen-h-s) (set pos.y screen-h-s) (set vel.y 0)))
+;; "Call before updating pos to keep it in bounds."
+;; (when (or (< pos.x 0) (> pos.x screen-w-s)) (*= vel.x -1.5))
+;; (when (or (< pos.y 0) (> pos.y screen-h-s)) (*= vel.y -1.5)))
 
 (fn move-away [from me scariness]
   "Return a vector to move away from 'from', scaled by distance and scariness, 0 if too far away.
