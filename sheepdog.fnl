@@ -71,10 +71,12 @@
           ,n))
 
 (macro *= [a b]
+       "Set a to a*b and return a."
        `(do
           (set ,a (* ,a ,b))
           ,a))
 
+; Will be set by construct-map to a closure.
 (var draw-map nil)
 
 ((fn construct-map []
@@ -87,19 +89,20 @@
     (local y (random0 17))
     (when (= 0 (mget x y)) (mset x y (pick-random decorations))))
    
-   ; todo: fill up the map
-   ;(for [i 0 30] (for [j 0 17] (mset i j 21)))
    (set draw-map (fn [] (map)))))
 
 (global TIC
         (fn tic []
-          "The main game loop. On each frame call all updaters then all drawers."
-          (each [_ f (pairs fns-update)] (f))
+          "The main game loop. On each frame call all updaters then all drawers.
+          When a sheep is drawn it adds its coords to herd-center, which we divide
+          by the number of sheep here to calculate the average = coords of the center
+          of the herd. Sheep that are scared by the dog move towards that location."
+          (each [_ f (pairs fns-update)] (f)) ; Call all updaters.
           
           (draw-map)
           
           (set herd-center (xy 0 0))
-          (each [_ f (pairs fns-draw)] (f))
+          (each [_ f (pairs fns-draw)] (f)) ; Call all drawers.
           (set herd-center (xy/ herd-center sheep-count))
           
           (++ t)))
@@ -250,16 +253,17 @@
                  bg-colour 1 self.flip)
             (when (~= nil post-draw) (post-draw self))))))
 
+; Call this to create a new player dog at the center of the screen.
 (local new-player (entity-template
                    ; init
-                   (fn [self]
+                   (fn init [self]
                      (set self.pos (xy (/ screen-w-s 2) (/ screen-h-s 2)))
                      (set self.spr-run 272)
                      (set self.spr-idle 274)
                      (set self.scariness 50)
                      (tset scary-ids self.id 1))
                    ; update -> action
-                   (fn [self]
+                   (fn update [self]
                      (var (action scared) (move-away-from-all self.pos self.id))
                      (xy+
                       (get-action (center self.pos) self.accel)
@@ -267,21 +271,22 @@
                    ; post-draw
                    nil))
 
+; Call this to create a new sheep at a random location.
 (local new-sheep (entity-template
                   ; init
-                  (fn [self]
+                  (fn init [self]
                     (set self.pos (xy (math.random screen-w-s) (math.random screen-h-s)))
                     (set self.spr-run 256)
                     (set self.spr-idle 258))
                   ; update -> action
-                  (fn [self]
+                  (fn update [self]
                     (var (action scared) (move-away-from-all self.pos self.id))
                     ; If moving away from player, head towards the center of the herd.
                     (when scared
                       (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
                     (normalise action self.accel))
                   ; post-draw
-                  (fn [self]
+                  (fn post-draw [self]
                     (set herd-center (xy+ herd-center self.pos)))))
 
 ; Create the persistent entities.
