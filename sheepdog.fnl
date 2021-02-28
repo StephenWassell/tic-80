@@ -4,8 +4,8 @@
 ;; script: fennel
 
 (macro xy [x y]
-  "Create a new vector. Vectors are tables containing :x and :y values."
-  `{:x ,x :y ,y})
+       "Create a new vector. Vectors are tables containing :x and :y values."
+       `{:x ,x :y ,y})
 
 ; Constants and globals.
 
@@ -177,30 +177,58 @@
   "True if we need the sprite for moving, given pixels per frame."
   (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
 
-; Collision detection. The hard field boundary and soft collisions with other sprites
-; handled differently.
+; Hard collision detection for the field boundary and solid map objects.
 
-; todo: how to deal with fences etc?
+(fn solid [x y]
+  "Return true if the location is in a solid object on the map, eg fences."
+  (local map-x (/ x 8))
+  (local map-y (/ y 8))
+  (or (fget (mget map-x map-y) 0)
+      (fget (mget (+ .9 map-x) map-y) 0)
+      (fget (mget (+ .9 map-x) (+ .9 map-y)) 0)
+      (fget (mget map-x (+ .9 map-y)) 0)))
+
+(fn find-random-space []
+  "Return a random location that's not over a solid object on the map.
+  Used to place new sheep."
+  (local ret (xy (math.random screen-w-s) (math.random screen-h-s)))
+  (if (solid ret.x ret.y)
+    (find-random-space)
+    ret))
 
 (fn stay-in-field [pos vel]
-  "Call after updating pos to keep it in bounds, and stop moving in a bad direction.
-  This is a hard collision."
-  (when (< pos.x 0) (set pos.x 0) (set vel.x 0))
-  (when (< pos.y 0) (set pos.y 0) (set vel.y 0))
-  (when (> pos.x screen-w-s) (set pos.x screen-w-s) (set vel.x 0))
-  (when (> pos.y screen-h-s) (set pos.y screen-h-s) (set vel.y 0)))
-;; Not such a good method, simpler but too bouncy.
-;; (when (or (< pos.x 0) (> pos.x screen-w-s)) (*= vel.x -1.5))
-;; (when (or (< pos.y 0) (> pos.y screen-h-s)) (*= vel.y -1.5)))
+  "Call before updating pos to keep it in bounds and off solid map objects.
+  Modifies vel. This is a hard collision.
+  
+  First check collisions due to x and y movement separately, so the entity
+  can glide along the obstacle rather than get stuck on it. The final check
+  on the updated position is to deal with convex corners."
+  (local new-x (+ pos.x vel.x))
+  (local new-y (+ pos.y vel.y))
+  (when (or
+    (< new-x 0)
+    (> new-x (+ 1 screen-w-s))
+    (solid new-x pos.y))
+    (set vel.x 0))
+  (when (or
+    (< new-y 0)
+    (> new-y (+ 1 screen-h-s))
+    (solid pos.x new-y))
+    (set vel.y 0))
+  (when (solid (+ pos.x vel.x) (+ pos.y vel.y))
+    (set vel.x 0)
+    (set vel.y 0)))
+
+; Soft collision detection between the sheep and dog.
 
 (fn move-away [from me scariness]
   "Return a vector to move away from 'from', scaled by distance and scariness, 0 if too far away.
   Include some randomness to avoid them getting stuck together."
-  (let [away (xy+ (xy* (xy-random) 5) (xy- from me))
-        mag (magnitude away)]
-    (if (> mag scariness) (xy 0 0) ; too far away
-      (< mag 1) (xy-random) ; too close
-      (normalise away (/ scariness mag)))))
+  (local away (xy+ (xy* (xy-random) 5) (xy- from me)))
+  (local mag (magnitude away))
+  (if (> mag scariness) (xy 0 0) ; too far away
+    (< mag 1) (xy-random) ; too close
+    (normalise away (/ scariness mag))))
 
 (fn move-away-from-all [me id]
   "Sum the move-away vectors for all nearby entities."
@@ -281,13 +309,13 @@
                    (if (and (xy0? action) (> t self.idle-time)) self.spr-idle self.spr-run))
               ; Don't use idle sprite until not moving for a moment.
               (when (not (xy0? action)) (set self.idle-time (+ t 20)))
-              (set self.vel (xy* (xy+ self.vel action) self.friction)))))
+              (set self.vel (xy* (xy+ self.vel action) self.friction))
+              (stay-in-field self.pos self.vel))))
     
     ; Always add a closure to fns-draw.
     (tset fns-draw self.id
           (fn []
             "Update pos from vel, and draw the sprite at pos."
-            (stay-in-field self.pos self.vel)
             (set self.pos (xy+ self.pos self.vel))
             (spr (alternate self.sprite self.id)
                  self.pos.x self.pos.y
@@ -316,7 +344,7 @@
 (local new-sheep (entity-template
                   ; init
                   (fn init [self]
-                    (set self.pos (xy (math.random screen-w-s) (math.random screen-h-s)))
+                    (set self.pos (find-random-space))
                     (set self.spr-run 256)
                     (set self.spr-idle 258))
                   ; update -> action
@@ -526,7 +554,15 @@
 
 ;; <MAP>
 ;; 001:002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+;; 005:000000000000000000003400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+;; 006:000000000000000000003500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+;; 007:000000000000000000003600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+;; 008:000000000000000000003700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 ;; </MAP>
+
+;; <FLAGS>
+;; 000:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010101010101000000010000000000000100000000000000000100000000000001000000000000000001000000000000010000000000000000010000000000000100000000000000000100000000000001010101010101010101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+;; </FLAGS>
 
 ;; <PALETTE>
 ;; 000:2e3740fbfcaaffce00f4b41bb6d53c71aa343f7e0092f4ff42cafd3978a8bcb7c58d87a2bf79587a444aff0000f8f8f8
