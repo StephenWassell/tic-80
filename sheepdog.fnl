@@ -370,7 +370,7 @@
   (local levels [
                  (fn level1 []
                    (set sheep-count 12)
-                   (create-entities 12)
+                   (create-entities)
                    {
                     :draw (fn []
                             (map))
