@@ -327,41 +327,30 @@
                   (fn post-draw [self]
                     (set herd-center (xy+ herd-center self.pos)))))
 
-; Will be set by construct-map to a closure.
-(var draw-map nil)
+(fn decorate-map []
+  "Add some flowers to empty space on the map."
+  (local decorations [21 34 146 81 87 117])
+  ; Decorate empty areas of the map.
+  ; todo: increase values when we use more maps
+  (for [i 0 20]
+    (local x (random0 30))
+    (local y (random0 17))
+    (when (= 0 (mget x y)) (mset x y (pick-random decorations)))))
 
-((fn construct-map []
-   "Called immediately to initialise the map and its methods."
-   ; These sprites are decorations to be applied randomly to the map.
-   (local decorations [21 34 146 81 87 117])
-   ; Decorate empty areas of the map.
-   (for [i 0 20]
-     (local x (random0 30))
-     (local y (random0 17))
-     (when (= 0 (mget x y)) (mset x y (pick-random decorations))))
-   
-   (set draw-map (fn [] (map)))))
-
-(fn game []
-  "Coroutine to step through levels and run the main game loop."
-
-  ; Create the persistent entities.
-  (new-player)
-  (for [_ 1 sheep-count] (new-sheep))
-
-  ; todo: levels
-
-  (while true
-    ; The main game loop. On each frame call all updaters then all drawers.
-    ; When a sheep is drawn it adds its coords to herd-center, which we divide
-    ; by the number of sheep here to calculate the average = coords of the center
-    ; of the herd. Sheep that are scared by the dog move towards that location.
-
+(fn play-until-won [level]
+  "The main game loop, called from the game coroutine.
+  On each frame call all updaters then all drawers.
+  When a sheep is drawn it adds its coords to herd-center, which we divide
+  by the number of sheep here to calculate the average = coords of the center
+  of the herd. Sheep that are scared by the dog move towards that location."
+  
+  (while (not (level.won?))
+    
     (coroutine.yield) ; Wait for TIC
     
     (each [_ f (pairs fns-update)] (f)) ; Call all updaters.
     
-    (draw-map)
+    (level.draw)
     
     (set herd-center (xy 0 0))
     (each [_ f (pairs fns-draw)] (f)) ; Call all drawers.
@@ -369,12 +358,40 @@
     
     (++ t)))
 
-(local co-game (coroutine.create game))
-(coroutine.resume co-game)
+(fn create-entities []
+  (new-player)
+  (for [_ 1 sheep-count] (new-sheep)))
 
-(global TIC
-        (fn tic []
-          (coroutine.resume co-game)))
+(fn game []
+  "Coroutine to step through levels and run the main game loop."
+  
+  (decorate-map)
+  
+  (local levels [
+                 (fn level1 []
+                   (set sheep-count 12)
+                   (create-entities 12)
+                   {
+                    :draw (fn []
+                            (map))
+                    :won? (fn []
+                            ; todo: check for win
+                            false)})])
+  
+  (each [_ f (ipairs levels)]
+        ; Call the level's function to initialise and return a dict.
+        (local level (f))
+        
+        ; todo: introduce level and wait for keypress
+        
+        (play-until-won level)
+        
+        ; todo: clear out at end of level
+        ))
+
+(local co-game (coroutine.create game))
+(coroutine.resume co-game) ; initial resume to get things started
+(global TIC (fn tic [] (coroutine.resume co-game)))
 
 ;; <TILES>
 ;; 000:5555555555555555555555555555555555555555555555555555555555555555
