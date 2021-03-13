@@ -105,37 +105,6 @@
   "Return a random number in the range 0 <= n < max."
   (- (math.random max) 1))
 
-; Will be set by construct-map to a closure.
-(var draw-map nil)
-
-((fn construct-map []
-   "Called immediately to initialise the map and its methods."
-   ; These sprites are decorations to be applied randomly to the map.
-   (local decorations [21 34 146 81 87 117])
-   ; Decorate empty areas of the map.
-   (for [i 0 20]
-     (local x (random0 30))
-     (local y (random0 17))
-     (when (= 0 (mget x y)) (mset x y (pick-random decorations))))
-   
-   (set draw-map (fn [] (map)))))
-
-(global TIC
-        (fn tic []
-          "The main game loop. On each frame call all updaters then all drawers.
-          When a sheep is drawn it adds its coords to herd-center, which we divide
-          by the number of sheep here to calculate the average = coords of the center
-          of the herd. Sheep that are scared by the dog move towards that location."
-          (each [_ f (pairs fns-update)] (f)) ; Call all updaters.
-          
-          (draw-map)
-          
-          (set herd-center (xy 0 0))
-          (each [_ f (pairs fns-draw)] (f)) ; Call all drawers.
-          (set herd-center (xy/ herd-center sheep-count))
-          
-          (++ t)))
-
 ; Input handling.
 
 (fn buttons []
@@ -206,14 +175,14 @@
   (local new-x (+ pos.x vel.x))
   (local new-y (+ pos.y vel.y))
   (when (or
-    (< new-x 0)
-    (> new-x (+ 1 screen-w-s))
-    (solid new-x pos.y))
+         (< new-x 0)
+         (> new-x (+ 1 screen-w-s))
+         (solid new-x pos.y))
     (set vel.x 0))
   (when (or
-    (< new-y 0)
-    (> new-y (+ 1 screen-h-s))
-    (solid pos.x new-y))
+         (< new-y 0)
+         (> new-y (+ 1 screen-h-s))
+         (solid pos.x new-y))
     (set vel.y 0))
   (when (solid (+ pos.x vel.x) (+ pos.y vel.y))
     (set vel.x 0)
@@ -358,9 +327,54 @@
                   (fn post-draw [self]
                     (set herd-center (xy+ herd-center self.pos)))))
 
-; Create the persistent entities.
-(new-player)
-(for [_ 1 sheep-count] (new-sheep))
+; Will be set by construct-map to a closure.
+(var draw-map nil)
+
+((fn construct-map []
+   "Called immediately to initialise the map and its methods."
+   ; These sprites are decorations to be applied randomly to the map.
+   (local decorations [21 34 146 81 87 117])
+   ; Decorate empty areas of the map.
+   (for [i 0 20]
+     (local x (random0 30))
+     (local y (random0 17))
+     (when (= 0 (mget x y)) (mset x y (pick-random decorations))))
+   
+   (set draw-map (fn [] (map)))))
+
+(fn game []
+  "Coroutine to step through levels and run the main game loop."
+
+  ; Create the persistent entities.
+  (new-player)
+  (for [_ 1 sheep-count] (new-sheep))
+
+  ; todo: levels
+
+  (while true
+    ; The main game loop. On each frame call all updaters then all drawers.
+    ; When a sheep is drawn it adds its coords to herd-center, which we divide
+    ; by the number of sheep here to calculate the average = coords of the center
+    ; of the herd. Sheep that are scared by the dog move towards that location.
+
+    (coroutine.yield) ; Wait for TIC
+    
+    (each [_ f (pairs fns-update)] (f)) ; Call all updaters.
+    
+    (draw-map)
+    
+    (set herd-center (xy 0 0))
+    (each [_ f (pairs fns-draw)] (f)) ; Call all drawers.
+    (set herd-center (xy/ herd-center sheep-count))
+    
+    (++ t)))
+
+(local co-game (coroutine.create game))
+(coroutine.resume co-game)
+
+(global TIC
+        (fn tic []
+          (coroutine.resume co-game)))
 
 ;; <TILES>
 ;; 000:5555555555555555555555555555555555555555555555555555555555555555
