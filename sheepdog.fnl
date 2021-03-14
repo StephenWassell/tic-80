@@ -38,6 +38,14 @@
 
 ; Some utility functions.
 
+(fn tidy-up []
+  "Initialise globals at the start of a new level."
+  (set sheep-count 0)
+  (set scary-ids {})
+  (set fns-move-away {})
+  (set fns-update {})
+  (set fns-draw {}))
+
 (macro ++ [n]
        "Increment n and return the new value."
        `(do
@@ -310,9 +318,11 @@
                    nil))
 
 ; Call this to create a new sheep at a random location.
+; Increment sheep-count on init so we know how many are in the herd.
 (local new-sheep (entity-template
                   ; init
                   (fn init [self]
+                    (++ sheep-count)
                     (set self.pos (find-random-space))
                     (set self.spr-run 256)
                     (set self.spr-idle 258))
@@ -343,54 +353,64 @@
   When a sheep is drawn it adds its coords to herd-center, which we divide
   by the number of sheep here to calculate the average = coords of the center
   of the herd. Sheep that are scared by the dog move towards that location."
-  
   (while (not (level.won?))
-    
-    (coroutine.yield) ; Wait for TIC
-    
-    (each [_ f (pairs fns-update)] (f)) ; Call all updaters.
-    
+    ; Wait for the engine to call the TIC function.
+    (coroutine.yield)
+    ; Call all updaters - decide where the dog and sheep will move to.
+    (each [_ f (pairs fns-update)] (f))
+    ; Draw the map.
     (level.draw)
-    
+    ; Call all drawers. Sheep will add their coords to herd-center.
     (set herd-center (xy 0 0))
-    (each [_ f (pairs fns-draw)] (f)) ; Call all drawers.
+    (each [_ f (pairs fns-draw)] (f))
     (set herd-center (xy/ herd-center sheep-count))
-    
     (++ t)))
 
-(fn create-entities []
+(fn create-entities [sheep]
   (new-player)
-  (for [_ 1 sheep-count] (new-sheep)))
+  (for [_ 1 sheep] (new-sheep)))
+
+(fn button-pressed? []
+  "Return true if any mouse or controller button is pressed."
+  (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
+  (or left middle right (btn 4) (btn 5) (btn 6) (btn 7)))
+
+(fn intro [message]
+  "Return a closure which creates a level that just displays a message."
+  (fn level []
+    {:draw (fn []
+             (cls 6)
+             (print (.. message "\n\nPress any button to play...") 16 16 15))
+     :won? button-pressed?}))
+
+(fn level1 []
+  (create-entities 12)
+  {:draw (fn []
+           (map)
+           (circb (/ screen-w 2) (/ screen-h 2) (/ screen-h 4) 15))
+   :won? (fn []
+           ; todo: check for win
+           false)})
 
 (fn game []
   "Coroutine to step through levels and run the main game loop."
   
-  (decorate-map)
-  
   (local levels [
-                 (fn level1 []
-                   (set sheep-count 12)
-                   (create-entities)
-                   {
-                    :draw (fn []
-                            (map))
-                    :won? (fn []
-                            ; todo: check for win
-                            false)})])
+                 ; todo: title-screen
+                 (intro "Level 1\n\nHerd the sheep into the circle.") level1
+                 ])
   
+  (decorate-map)
   (each [_ f (ipairs levels)]
-        ; Call the level's function to initialise and return a dict.
+        ; Call the level's closure to initialise and return a dict.
         (local level (f))
-        
-        ; todo: introduce level and wait for keypress
-        
         (play-until-won level)
-        
-        ; todo: clear out at end of level
-        ))
+        (tidy-up)))
 
+; Create a coroutine from the game function and resume it on each frame.
+; It needs an initial resume call to get things started.
 (local co-game (coroutine.create game))
-(coroutine.resume co-game) ; initial resume to get things started
+(coroutine.resume co-game)
 (global TIC (fn tic [] (coroutine.resume co-game)))
 
 ;; <TILES>
@@ -585,10 +605,6 @@
 
 ;; <MAP>
 ;; 001:002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-;; 005:000000000000000000003400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-;; 006:000000000000000000003500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-;; 007:000000000000000000003600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-;; 008:000000000000000000003700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 ;; </MAP>
 
 ;; <FLAGS>
