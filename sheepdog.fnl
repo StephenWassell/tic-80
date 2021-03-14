@@ -377,10 +377,12 @@
 
 (fn intro [message]
   "Return a closure which creates a level that just displays a message."
+  (local text (.. message "\n\nPress any button to play..."))
   (fn level []
     {:draw (fn []
-             (cls 6)
-             (print (.. message "\n\nPress any button to play...") 16 16 15))
+             (cls 12)
+             (print text 17 17 13)
+             (print text 16 16 1))
      :won? button-pressed?}))
 
 (fn level1 []
