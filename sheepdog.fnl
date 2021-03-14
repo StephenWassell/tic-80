@@ -22,12 +22,6 @@
 ; Incremented on each frame.
 (var t 0)
 
-; Will be updated on draw to the average sheep location.
-(var herd-center (xy 120 60))
-
-; How many to create.
-(var sheep-count 20)
-
 ; Set of ids of things that scare the sheep - eg player.
 (var scary-ids {})
 
@@ -40,7 +34,6 @@
 
 (fn tidy-up []
   "Initialise globals at the start of a new level."
-  (set sheep-count 0)
   (set scary-ids {})
   (set fns-move-away {})
   (set fns-update {})
@@ -51,6 +44,12 @@
        `(do
           (set ,n (+ ,n 1))
           ,n))
+
+(macro += [a b]
+       "Set a to a+b and return a."
+       `(do
+          (set ,a (+   ,a ,b))
+          ,a))
 
 (macro *= [a b]
        "Set a to a*b and return a."
@@ -275,9 +274,9 @@
     ; Optionally add a closure to fns-update.
     (when (~= nil update)
       (tset fns-update self.id
-            (fn []
+            (fn [herd-center]
               "Update vel from the action vector returned by update."
-              (var action (update self))
+              (var action (update self herd-center))
               (when (and (~= action.x 0) (> t self.flip-time))
                 (set self.flip (if (> action.x 0) 1 0))
                 ; Don't change flip again for a moment.
@@ -289,15 +288,18 @@
               (set self.vel (xy* (xy+ self.vel action) self.friction))
               (stay-in-field self.pos self.vel))))
     
-    ; Always add a closure to fns-draw.
+    ; Always add a closure to fns-draw. Return what post-draw returned,
+    ; or 0 if nil. This is used for counting the sheep.
     (tset fns-draw self.id
-          (fn []
+          (fn [herd-center]
             "Update pos from vel, and draw the sprite at pos."
             (set self.pos (xy+ self.pos self.vel))
             (spr (alternate self.sprite self.id)
                  self.pos.x self.pos.y
                  bg-colour 1 self.flip)
-            (when (~= nil post-draw) (post-draw self))))))
+            (if (~= nil post-draw)
+              (post-draw self herd-center)
+              0)))))
 
 ; Call this to create a new player dog at the center of the screen.
 (local new-player (entity-template
@@ -318,24 +320,24 @@
                    nil))
 
 ; Call this to create a new sheep at a random location.
-; Increment sheep-count on init so we know how many are in the herd.
 (local new-sheep (entity-template
                   ; init
                   (fn init [self]
-                    (++ sheep-count)
                     (set self.pos (find-random-space))
                     (set self.spr-run 256)
                     (set self.spr-idle 258))
                   ; update -> action
-                  (fn update [self]
+                  (fn update [self herd-center]
                     (var (action scared) (move-away-from-all self.pos self.id))
                     ; If moving away from player, head towards the center of the herd.
                     (when scared
                       (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
                     (normalise action self.accel))
-                  ; post-draw
-                  (fn post-draw [self]
-                    (set herd-center (xy+ herd-center self.pos)))))
+                  ; post-draw -> 1
+                  (fn post-draw [self herd-center]
+                    (set herd-center.x (+ herd-center.x self.pos.x))
+                    (set herd-center.y (+ herd-center.y self.pos.y))
+                    1)))
 
 (fn decorate-map []
   "Add some flowers to empty space on the map."
@@ -353,16 +355,23 @@
   When a sheep is drawn it adds its coords to herd-center, which we divide
   by the number of sheep here to calculate the average = coords of the center
   of the herd. Sheep that are scared by the dog move towards that location."
+  
+  ; Will be updated on draw to the average sheep location.
+  (var herd-center (xy 120 60))
+  
   (while (not (level.won?))
     ; Wait for the engine to call the TIC function.
     (coroutine.yield)
     ; Call all updaters - decide where the dog and sheep will move to.
-    (each [_ f (pairs fns-update)] (f))
+    (each [_ update (pairs fns-update)]
+          (update herd-center))
     ; Draw the map.
     (level.draw)
     ; Call all drawers. Sheep will add their coords to herd-center.
     (set herd-center (xy 0 0))
-    (each [_ f (pairs fns-draw)] (f))
+    (var sheep-count 0)
+    (each [_ draw (pairs fns-draw)]
+          (+= sheep-count (draw herd-center)))
     (set herd-center (xy/ herd-center sheep-count))
     (++ t)))
 
