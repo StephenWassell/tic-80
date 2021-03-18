@@ -291,14 +291,14 @@
     ; Always add a closure to fns-draw. Return what post-draw returned,
     ; or 0 if nil. This is used for counting the sheep.
     (tset fns-draw self.id
-          (fn [herd-center]
+          (fn [callback]
             "Update pos from vel, and draw the sprite at pos."
             (set self.pos (xy+ self.pos self.vel))
             (spr (alternate self.sprite self.id)
                  self.pos.x self.pos.y
                  bg-colour 1 self.flip)
             (if (~= nil post-draw)
-              (post-draw self herd-center)
+              (post-draw self callback)
               0)))))
 
 ; Call this to create a new player dog at the center of the screen.
@@ -333,11 +333,9 @@
                     (when scared
                       (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
                     (normalise action self.accel))
-                  ; post-draw -> 1
-                  (fn post-draw [self herd-center]
-                    (set herd-center.x (+ herd-center.x self.pos.x))
-                    (set herd-center.y (+ herd-center.y self.pos.y))
-                    1)))
+                  ; post-draw
+                  (fn post-draw [self callback]
+                    (callback self.pos))))
 
 (fn decorate-map []
   "Add some flowers to empty space on the map."
@@ -371,7 +369,9 @@
     (set herd-center (xy 0 0))
     (var sheep-count 0)
     (each [_ draw (pairs fns-draw)]
-          (+= sheep-count (draw herd-center)))
+          (draw (fn [pos]
+                  (set herd-center (xy+ herd-center pos))
+                  (++ sheep-count))))
     (set herd-center (xy/ herd-center sheep-count))
     (++ t)))
 
