@@ -37,7 +37,8 @@
   (set scary-ids {})
   (set fns-move-away {})
   (set fns-update {})
-  (set fns-draw {}))
+  (set fns-draw {})
+  (collectgarbage))
 
 (macro ++ [n]
        "Increment n and return the new value."
@@ -298,8 +299,7 @@
                  self.pos.x self.pos.y
                  bg-colour 1 self.flip)
             (if (~= nil post-draw)
-              (post-draw self callback)
-              0)))))
+              (post-draw self callback))))))
 
 ; Call this to create a new player dog at the center of the screen.
 (local new-player (entity-template
@@ -420,9 +420,9 @@
 
 ; Create a coroutine from the game function and resume it on each frame.
 ; It needs an initial resume call to get things started.
-(local co-game (coroutine.create game))
-(coroutine.resume co-game)
-(global TIC (fn tic [] (coroutine.resume co-game)))
+(local resume-game (coroutine.wrap game))
+(resume-game)
+(global TIC (fn tic [] (resume-game)))
 
 ;; <TILES>
 ;; 000:5555555555555555555555555555555555555555555555555555555555555555
