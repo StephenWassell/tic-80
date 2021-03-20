@@ -27,8 +27,8 @@
 
 ; Tables of entity id => closure. All entries in update and draw are called on each frame.
 (var fns-move-away {}) ; id (fn [from]) -> vector to move away from 'from'
-(var fns-update {}) ; id (fn []) -> action vector
-(var fns-draw {}) ; id (fn [])
+(var fns-update []) ; (fn []) -> action vector
+(var fns-draw []) ; (fn [callback])
 
 ; Some utility functions.
 
@@ -36,8 +36,8 @@
   "Initialise globals at the start of a new level."
   (set scary-ids {})
   (set fns-move-away {})
-  (set fns-update {})
-  (set fns-draw {})
+  (set fns-update [])
+  (set fns-draw [])
   (collectgarbage))
 
 (macro ++ [n]
@@ -274,32 +274,34 @@
     
     ; Optionally add a closure to fns-update.
     (when (~= nil update)
-      (tset fns-update self.id
-            (fn [herd-center]
-              "Update vel from the action vector returned by update."
-              (var action (update self herd-center))
-              (when (and (~= action.x 0) (> t self.flip-time))
-                (set self.flip (if (> action.x 0) 1 0))
-                ; Don't change flip again for a moment.
-                (set self.flip-time (+ t 10)))
-              (set self.sprite
-                   (if (and (xy0? action) (> t self.idle-time)) self.spr-idle self.spr-run))
-              ; Don't use idle sprite until not moving for a moment.
-              (when (not (xy0? action)) (set self.idle-time (+ t 20)))
-              (set self.vel (xy* (xy+ self.vel action) self.friction))
-              (stay-in-field self.pos self.vel))))
+      (table.insert fns-update
+                    (fn [herd-center]
+                      "Update vel from the action vector returned by update."
+                      (var action (update self herd-center))
+                      (when (and (~= action.x 0) (> t self.flip-time))
+                        (set self.flip (if (> action.x 0) 1 0))
+                        ; Don't change flip again for a moment.
+                        (set self.flip-time (+ t 10)))
+                      (set self.sprite
+                           (if (and (xy0? action) (> t self.idle-time))
+                             self.spr-idle
+                             self.spr-run))
+                      ; Don't use idle sprite until not moving for a moment.
+                      (when (not (xy0? action)) (set self.idle-time (+ t 20)))
+                      (set self.vel (xy* (xy+ self.vel action) self.friction))
+                      (stay-in-field self.pos self.vel))))
     
     ; Always add a closure to fns-draw. Return what post-draw returned,
     ; or 0 if nil. This is used for counting the sheep.
-    (tset fns-draw self.id
-          (fn [callback]
-            "Update pos from vel, and draw the sprite at pos."
-            (set self.pos (xy+ self.pos self.vel))
-            (spr (alternate self.sprite self.id)
-                 self.pos.x self.pos.y
-                 bg-colour 1 self.flip)
-            (if (~= nil post-draw)
-              (post-draw self callback))))))
+    (table.insert fns-draw
+                  (fn [callback]
+                    "Update pos from vel, and draw the sprite at pos."
+                    (set self.pos (xy+ self.pos self.vel))
+                    (spr (alternate self.sprite self.id)
+                         self.pos.x self.pos.y
+                         bg-colour 1 self.flip)
+                    (if (~= nil post-draw)
+                      (post-draw self callback))))))
 
 ; Call this to create a new player dog at the center of the screen.
 (local new-player (entity-template
@@ -360,19 +362,20 @@
   (while (not (level.won?))
     ; Wait for the engine to call the TIC function.
     (coroutine.yield)
+    
     ; Call all updaters - decide where the dog and sheep will move to.
-    (each [_ update (pairs fns-update)]
+    (each [_ update (ipairs fns-update)]
           (update herd-center))
-    ; Draw the map.
-    (level.draw)
+    
     ; Call all drawers. Sheep will add their coords to herd-center.
     (set herd-center (xy 0 0))
     (var sheep-count 0)
-    (each [_ draw (pairs fns-draw)]
+    (each [_ draw (ipairs fns-draw)]
           (draw (fn [pos]
                   (set herd-center (xy+ herd-center pos))
                   (++ sheep-count))))
     (set herd-center (xy/ herd-center sheep-count))
+
     (++ t)))
 
 (fn create-entities [sheep]
@@ -387,19 +390,19 @@
 (fn intro [message]
   "Return a closure which creates a level that just displays a message."
   (local text (.. message "\n\nPress any button to play..."))
+  (table.insert fns-draw (fn []
+                           (cls 12)
+                           (print text 17 17 13)
+                           (print text 16 16 1)))
   (fn level []
-    {:draw (fn []
-             (cls 12)
-             (print text 17 17 13)
-             (print text 16 16 1))
-     :won? button-pressed?}))
+    {:won? button-pressed?}))
 
 (fn level1 []
+  (table.insert fns-draw (fn []
+                           (map)
+                           (circb (/ screen-w 2) (/ screen-h 2) (/ screen-h 4) 15)))
   (create-entities 12)
-  {:draw (fn []
-           (map)
-           (circb (/ screen-w 2) (/ screen-h 2) (/ screen-h 4) 15))
-   :won? (fn []
+  {:won? (fn []
            ; todo: check for win
            false)})
 
