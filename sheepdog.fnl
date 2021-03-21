@@ -374,7 +374,7 @@
     ; Will remain true only when all sheep are in the finish area.
     (set finished true)
     
-    ; Call all drawers. Sheep will add their coords to herd-center,
+    ; Call all drawers. For each sheep, add their coords to herd-center,
     ; and call the closure returned by the level to check if they
     ; are still in play (true) or in the finish area (false).
     (each [_ draw (ipairs fns-draw)]
@@ -394,7 +394,7 @@
 (fn intro [message]
   "Return a closure which creates a level that just displays a message."
   (fn []
-    (local text (.. message "\n\nPress any button to play..."))
+    (local text (.. message "\n\nPress X or click to play..."))
     (table.insert fns-draw (fn [callback]
                              (cls 12)
                              (print text 17 17 13)
