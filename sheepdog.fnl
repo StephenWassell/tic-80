@@ -3,10 +3,6 @@
 ;; desc:   Art by u/please_send_cookies
 ;; script: fennel
 
-(macro xy [x y]
-       "Create a new vector. Vectors are tables containing :x and :y values."
-       `{:x ,x :y ,y})
-
 ; Constants and globals.
 
 ; TIC-80 screen size.
@@ -15,6 +11,9 @@
 ; Reduced by the size of a sprite.
 (local screen-w-s (- screen-w 8))
 (local screen-h-s (- screen-h 8))
+; Center of the screen.
+(local center-x (/ screen-w 2))
+(local center-y (/ screen-h 2))
 
 ; Background of the map and transparent sprites - dark green.
 (local bg-colour 5)
@@ -64,6 +63,10 @@
                     (fn [] (++ id)))))
 
 ; Vector arithmetic.
+
+(macro xy [x y]
+       "Create a new vector. Vectors are tables containing :x and :y values."
+       `{:x ,x :y ,y})
 
 (fn xy* [v m]
   "Return a vector with both values multiplied by a scalar."
@@ -388,46 +391,72 @@
 
 (fn button-pressed? []
   "Return true if any mouse or controller button is pressed."
+  ; todo: like btnp for mouse click
   (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
-  (or left middle right (btn 4) (btn 5) (btn 6) (btn 7)))
+  (or left middle right (btnp 4) (btnp 5) (btnp 6) (btnp 7)))
 
-(fn intro [message]
+(fn print-shadow [text x y colour shadow]
+  "Like print but with a different colour shadow."
+  (print text (+ x 1) (+ y 1) shadow)
+  (print text x y colour))
+
+(fn title []
+  ; todo: add auto dog
+  (local text "One Man and His Dog\n\nPress X or click to start...")
+  (table.insert fns-draw (fn [callback]
+                           (map)))
+  (for [_ 1 12] (new-sheep))
+  (table.insert fns-draw (fn [callback]
+                           (print-shadow text 16 16 15 6)))
+  ; Return false when we want to go to the next level.
+  (fn [] (not (button-pressed?))))
+
+(fn say [message]
   "Return a closure which creates a level that just displays a message."
   (fn []
-    (local text (.. message "\n\nPress X or click to play..."))
+    (local text (.. message "\n\nPress X or click to continue..."))
     (table.insert fns-draw (fn [callback]
-                             (cls 12)
-                             (print text 17 17 13)
-                             (print text 16 16 1)
+                             (cls 5) ; todo: avoid cls
+                             (print-shadow text 16 16 15 6)
                              (callback (xy 0 0))))
     ; Return false when we want to go to the next level.
     (fn [] (not (button-pressed?)))))
 
+(fn outside? [pos center radius]
+  "Return true if the sprite at pos is outside the circle defined by center and radius."
+  ; todo: check this is right
+  (local dx (- pos.x center.x -4))
+  (local dy (- pos.y center.y -4))
+  (> (+ (* dx dx) (* dy dy)) (* radius radius)))
+
 (fn level1 []
+  (local c (xy center-x center-y))
+  (local r (/ center-y 2))
   (table.insert fns-draw (fn []
                            (map)
-                           (circb (/ screen-w 2) (/ screen-h 2) (/ screen-h 4) 15)))
+                           (circb c.x c.y r 15)))
   (new-player)
-  (for [_ 1 15] (new-sheep))
+  (for [_ 1 12] (new-sheep))
   ; Return false when this sheep is in the finish area.
   (fn [pos]
-    ; todo: check if pos is outside the circle
-    true))
+    (outside? pos c r)))
 
 (fn game []
   "Coroutine to step through levels and run the main game loop."
   
   (local levels [
-                 ; todo: title-screen
-                 (intro "Level 1\n\nHerd the sheep into the circle.") level1
+                 title
+                 (say "Level 1\n\nHerd the sheep into the circle.") level1
+                 (say "Well done!\n\nWould you like to play again?")
                  ])
   
   (decorate-map)
-  (each [_ level (ipairs levels)]
-        ; Call the level's closure to initialise and return a closure,
-        ; which will be called for each sheep to check if the level is finished.
-        (play-level (level))
-        (tidy-up)))
+  (while true
+    (each [_ level (ipairs levels)]
+          ; Call the level's closure to initialise and return a closure,
+          ; which will be called for each sheep to check if the level is finished.
+          (play-level (level))
+          (tidy-up))))
 
 ; Create a coroutine from the game function and resume it on each frame.
 ; It needs an initial resume call to get things started.
