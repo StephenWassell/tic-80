@@ -349,7 +349,7 @@
     (local y (random0 17))
     (when (= 0 (mget x y)) (mset x y (pick-random decorations)))))
 
-(fn play-until-won [level]
+(fn play-level [is-in-play?]
   "The main game loop, called from the game coroutine.
   On each frame call all updaters then all drawers.
   When a sheep is drawn it adds its coords to herd-center, which we divide
@@ -359,7 +359,8 @@
   ; Will be updated on draw to the average sheep location.
   (var herd-center (xy 120 60))
   
-  (while (not (level.won?))
+  (var finished false)
+  (while (not finished)
     ; Wait for the engine to call the TIC function.
     (coroutine.yield)
     
@@ -367,20 +368,23 @@
     (each [_ update (ipairs fns-update)]
           (update herd-center))
     
-    ; Call all drawers. Sheep will add their coords to herd-center.
     (set herd-center (xy 0 0))
     (var sheep-count 0)
+    
+    ; Will remain true only when all sheep are in the finish area.
+    (set finished true)
+    
+    ; Call all drawers. Sheep will add their coords to herd-center,
+    ; and call the closure returned by the level to check if they
+    ; are still in play (true) or in the finish area (false).
     (each [_ draw (ipairs fns-draw)]
           (draw (fn [pos]
                   (set herd-center (xy+ herd-center pos))
-                  (++ sheep-count))))
+                  (++ sheep-count) ; zzz
+                  (when (is-in-play? pos) (set finished false)))))
     (set herd-center (xy/ herd-center sheep-count))
-
+    
     (++ t)))
-
-(fn create-entities [sheep]
-  (new-player)
-  (for [_ 1 sheep] (new-sheep)))
 
 (fn button-pressed? []
   "Return true if any mouse or controller button is pressed."
@@ -389,22 +393,26 @@
 
 (fn intro [message]
   "Return a closure which creates a level that just displays a message."
-  (local text (.. message "\n\nPress any button to play..."))
-  (table.insert fns-draw (fn []
-                           (cls 12)
-                           (print text 17 17 13)
-                           (print text 16 16 1)))
-  (fn level []
-    {:won? button-pressed?}))
+  (fn []
+    (local text (.. message "\n\nPress any button to play..."))
+    (table.insert fns-draw (fn [callback]
+                             (cls 12)
+                             (print text 17 17 13)
+                             (print text 16 16 1)
+                             (callback (xy 0 0))))
+    ; Return false when we want to go to the next level.
+    (fn [] (not (button-pressed?)))))
 
 (fn level1 []
   (table.insert fns-draw (fn []
                            (map)
                            (circb (/ screen-w 2) (/ screen-h 2) (/ screen-h 4) 15)))
-  (create-entities 12)
-  {:won? (fn []
-           ; todo: check for win
-           false)})
+  (new-player)
+  (for [_ 1 15] (new-sheep))
+  ; Return false when this sheep is in the finish area.
+  (fn [pos]
+    ; todo: check if pos is outside the circle
+    true))
 
 (fn game []
   "Coroutine to step through levels and run the main game loop."
@@ -415,10 +423,10 @@
                  ])
   
   (decorate-map)
-  (each [_ f (ipairs levels)]
-        ; Call the level's closure to initialise and return a dict.
-        (local level (f))
-        (play-until-won level)
+  (each [_ level (ipairs levels)]
+        ; Call the level's closure to initialise and return a closure,
+        ; which will be called for each sheep to check if the level is finished.
+        (play-level (level))
         (tidy-up)))
 
 ; Create a coroutine from the game function and resume it on each frame.
