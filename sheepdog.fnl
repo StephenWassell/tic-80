@@ -395,19 +395,23 @@
   (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
   (or left middle right (btnp 4) (btnp 5) (btnp 6) (btnp 7)))
 
-(fn print-shadow [text x y colour shadow]
-  "Like print but with a different colour shadow."
-  (print text (+ x 1) (+ y 1) shadow)
-  (print text x y colour))
+(fn print-border [text x y scale]
+  "Like print but yellow with a black border."
+  (each [_ offset (ipairs [(xy 0 1)
+                           (xy 0 -1)
+                           (xy 1 0)
+                           (xy -1 0)])]
+        (print text (+ x offset.x) (+ y offset.y) 0 false (if scale scale 1)))
+  (print text x y 2 false (if scale scale 1)))
 
 (fn title []
   ; todo: add auto dog
-  (local text "One Man and His Dog\n\nPress X or click to start...")
   (table.insert fns-draw (fn [callback]
                            (map)))
   (for [_ 1 12] (new-sheep))
   (table.insert fns-draw (fn [callback]
-                           (print-shadow text 16 16 15 6)))
+                           (print-border "One Man and His Dog" 16 16 2)
+                           (print-border "Press X or click to start..." 16 40)))
   ; Return false when we want to go to the next level.
   (fn [] (not (button-pressed?))))
 
@@ -417,7 +421,7 @@
     (local text (.. message "\n\nPress X or click to continue..."))
     (table.insert fns-draw (fn [callback]
                              (cls 5) ; todo: avoid cls
-                             (print-shadow text 16 16 15 6)
+                             (print-border text 16 16)
                              (callback (xy 0 0))))
     ; Return false when we want to go to the next level.
     (fn [] (not (button-pressed?)))))
