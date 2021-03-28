@@ -324,6 +324,29 @@
                    ; post-draw
                    nil))
 
+; Call this to create a new stray dog moving automatically.
+; It runs towards the mean of a target moving in a Lissajous curve,
+; and the center of the sheep herd.
+(local new-stray (entity-template
+                  ; init
+                  (fn init [self]
+                    (set self.pos (xy (/ screen-w-s 2) (/ screen-h-s 2)))
+                    (set self.spr-run 272)
+                    (set self.spr-idle 274)
+                    (set self.scariness 50)
+                    (tset scary-ids self.id 1))
+                  ; update -> action
+                  (fn update [self herd-center]
+                    (local target (xy (+ center-x (* center-x (math.cos (/ t 80))))
+                                      (+ center-y (* center-y (math.sin (/ t 70))))))
+                    (var (action scared) (move-away-from-all self.pos self.id))
+                    (xy+
+                     (normalise (xy+ (xy- target self.pos)
+                                     (xy- herd-center self.pos)) .2)
+                     (normalise action .5)))
+                  ; post-draw
+                  nil))
+
 ; Call this to create a new sheep at a random location.
 (local new-sheep (entity-template
                   ; init
@@ -405,9 +428,9 @@
   (print text x y 2 false (if scale scale 1)))
 
 (fn title []
-  ; todo: add auto dog
   (table.insert fns-draw (fn [callback]
                            (map)))
+  (new-stray)
   (for [_ 1 12] (new-sheep))
   (table.insert fns-draw (fn [callback]
                            (print-border "One Man and His Dog" 16 16 2)
@@ -420,7 +443,7 @@
   (fn []
     (local text (.. message "\n\nPress X or click to continue..."))
     (table.insert fns-draw (fn [callback]
-                             (cls 5) ; todo: avoid cls
+                             (cls 12) ; todo: avoid cls
                              (print-border text 16 16)
                              (callback (xy 0 0))))
     ; Return false when we want to go to the next level.
