@@ -37,84 +37,108 @@
   (set fns-move-away {})
   (set fns-update [])
   (set fns-draw [])
-  (collectgarbage))
+  (collectgarbage)
+  )
 
 (macro ++ [n]
        "Increment n and return the new value."
        `(do
           (set ,n (+ ,n 1))
-          ,n))
+          ,n
+          )
+       )
 
 (macro += [a b]
        "Set a to a+b and return a."
        `(do
           (set ,a (+   ,a ,b))
-          ,a))
+          ,a
+          )
+       )
 
 (macro *= [a b]
        "Set a to a*b and return a."
        `(do
           (set ,a (* ,a ,b))
-          ,a))
+          ,a
+          )
+       )
 
-(local unique-id ((fn [] ; Note double ( to call the closure immediately.
+(local unique-id (
+                  (fn [] ; Note double ( to call the closure immediately.
                     "Return a closure which increments id and returns the new value. Call in constructors."
                     (var id 0)
-                    (fn [] (++ id)))))
+                    (fn [] (++ id))
+                    )
+                  ))
 
 ; Vector arithmetic.
 
 (macro xy [x y]
        "Create a new vector. Vectors are tables containing :x and :y values."
-       `{:x ,x :y ,y})
+       `{:x ,x :y ,y}
+       )
 
 (fn xy* [v m]
   "Return a vector with both values multiplied by a scalar."
-  (xy (* v.x m) (* v.y m)))
+  (xy (* v.x m) (* v.y m))
+  )
 
 (fn xy/ [v d]
   "Return a vector with both values divided by a scalar."
-  (xy (/ v.x d) (/ v.y d)))
+  (xy (/ v.x d) (/ v.y d))
+  )
 
 (fn xy+ [a b]
   "Add two vectors."
-  (xy (+ a.x b.x) (+ a.y b.y)))
+  (xy (+ a.x b.x) (+ a.y b.y))
+  )
 
 (fn xy- [a b]
   "Subtract two vectors."
-  (xy (- a.x b.x) (- a.y b.y)))
+  (xy (- a.x b.x) (- a.y b.y))
+  )
 
 (fn xy0? [v]
   "Return true if both values are 0."
-  (= v.x v.y 0))
+  (= v.x v.y 0)
+  )
 
 (fn magnitude [v]
   "Return the magnitude of a vector."
-  (math.sqrt (+ (* v.x v.x) (* v.y v.y))))
+  (math.sqrt (+ (* v.x v.x) (* v.y v.y)))
+  )
 
 (fn normalise [v mag]
   "Normalise vector to a given magnitude."
   (let [scale (magnitude v)]
     (if (< scale .1) (xy 0 0) ; Avoid divide by 0 and excessive wiggling.
-      (xy* (xy/ v scale) mag))))
+      (xy* (xy/ v scale) mag)
+      )
+    )
+  )
 
 (fn center [pos]
   "The center of an 8x8 sprite."
-  (xy (+ pos.x 4) (+ pos.y 4)))
+  (xy (+ pos.x 4) (+ pos.y 4))
+  )
 
 ; Some functions to return random values.
 
 (fn xy-random []
   "Return a random vector with x and y in the range -.5 to .5."
-  (xy (- (math.random) .5) (- (math.random) .5)))
+  (xy (- (math.random) .5) (- (math.random) .5))
+  )
 
 (fn pick-random [array]
   "Return a randomly selected item from the provided array."
-  (. array (math.random (length array))))
+  (. array (math.random (length array)))
+  )
 
 (fn random0 [max]
   "Return a random number in the range 0 <= n < max."
-  (- (math.random max) 1))
+  (- (math.random max) 1)
+  )
 
 ; Input handling.
 
@@ -124,13 +148,17 @@
    (if (btn 0) 1 0)
    (if (btn 1) 1 0)
    (if (btn 2) 1 0)
-   (if (btn 3) 1 0)))
+   (if (btn 3) 1 0)
+   )
+  )
 
 (fn to-mouse [from]
   "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
   (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
   (if (or left middle right) (xy (- mouse-x from.x) (- mouse-y from.y))
-    (xy 0 0)))
+    (xy 0 0)
+    )
+  )
 
 (fn get-action [from accel]
   "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
@@ -144,18 +172,23 @@
                    (1 0 0 1) (xy 1 -1)
                    (0 1 1 0) (xy -1 1)
                    (0 1 0 1) (xy 1 1)
-                   _ (to-mouse from))] ; No buttons pressed, go towards mouse.
-    (normalise dir accel)))
+                   _ (to-mouse from) ; No buttons pressed, go towards mouse.
+                   )]
+    (normalise dir accel)
+    )
+  )
 
 ; Sprite selection.
 
 (fn alternate [s id]
   "Alternate between s and s+1 for running feet and wagging tails."
-  (+ s (/ (% (+ t (* id 10)) 24) 12)))
+  (+ s (/ (% (+ t (* id 10)) 24) 12))
+  )
 
 (fn moving [d]
   "True if we need the sprite for moving, given pixels per frame."
-  (or (> (math.abs d.x) .1) (> (math.abs d.y) .1)))
+  (or (> (math.abs d.x) .1) (> (math.abs d.y) .1))
+  )
 
 ; Hard collision detection for the field boundary and solid map objects.
 
@@ -166,7 +199,9 @@
   (or (fget (mget map-x map-y) 0)
       (fget (mget (+ .9 map-x) map-y) 0)
       (fget (mget (+ .9 map-x) (+ .9 map-y)) 0)
-      (fget (mget map-x (+ .9 map-y)) 0)))
+      (fget (mget map-x (+ .9 map-y)) 0)
+      )
+  )
 
 (fn find-random-space []
   "Return a random location that's not over a solid object on the map.
@@ -174,7 +209,9 @@
   (local ret (xy (math.random screen-w-s) (math.random screen-h-s)))
   (if (solid ret.x ret.y)
     (find-random-space)
-    ret))
+    ret
+    )
+  )
 
 (fn stay-in-field [pos vel]
   "Call before updating pos to keep it in bounds and off solid map objects.
@@ -188,16 +225,22 @@
   (when (or
          (< new-x 0)
          (> new-x (+ 1 screen-w-s))
-         (solid new-x pos.y))
-    (set vel.x 0))
+         (solid new-x pos.y)
+         )
+    (set vel.x 0)
+    )
   (when (or
          (< new-y 0)
          (> new-y (+ 1 screen-h-s))
-         (solid pos.x new-y))
-    (set vel.y 0))
+         (solid pos.x new-y)
+         )
+    (set vel.y 0)
+    )
   (when (solid (+ pos.x vel.x) (+ pos.y vel.y))
     (set vel.x 0)
-    (set vel.y 0)))
+    (set vel.y 0)
+    )
+  )
 
 ; Soft collision detection between the sheep and dog.
 
@@ -208,7 +251,9 @@
   (local mag (magnitude away))
   (if (> mag scariness) (xy 0 0) ; too far away
     (< mag 1) (xy-random) ; too close
-    (normalise away (/ scariness mag))))
+    (normalise away (/ scariness mag))
+    )
+  )
 
 (fn move-away-from-all [me id]
   "Sum the move-away vectors for all nearby entities."
@@ -219,8 +264,13 @@
           (let [vec (f me)] ; move away from it by this vector
             (when (not (xy0? vec)) ; close enough to move away from
               (set action (xy+ action (f me)))
-              (when (. scary-ids it) (set scared true))))))
-  (values action scared))
+              (when (. scary-ids it) (set scared true))
+              )
+            )
+          )
+        )
+  (values action scared)
+  )
 
 ; Creating game entities (is that the right word for how I've done it here?).
 
@@ -263,7 +313,8 @@
                
                ; How fast sheep need to run away from this entity.
                ; This is right for a sheep; increase for a dog.
-               :scariness 10 } )
+               :scariness 10
+               })
     
     ; Call the provided initialiser to change any of the above values.
     (init self)
@@ -273,7 +324,10 @@
       (tset fns-move-away self.id
             (fn [from]
               "Return a vector to move away from this entity."
-              (move-away from self.pos self.scariness))))
+              (move-away from self.pos self.scariness)
+              )
+            )
+      )
     
     ; Optionally add a closure to fns-update.
     (when (~= nil update)
@@ -284,15 +338,20 @@
                       (when (and (~= action.x 0) (> t self.flip-time))
                         (set self.flip (if (> action.x 0) 1 0))
                         ; Don't change flip again for a moment.
-                        (set self.flip-time (+ t 10)))
+                        (set self.flip-time (+ t 10))
+                        )
                       (set self.sprite
                            (if (and (xy0? action) (> t self.idle-time))
                              self.spr-idle
-                             self.spr-run))
+                             self.spr-run)
+                           )
                       ; Don't use idle sprite until not moving for a moment.
                       (when (not (xy0? action)) (set self.idle-time (+ t 20)))
                       (set self.vel (xy* (xy+ self.vel action) self.friction))
-                      (stay-in-field self.pos self.vel))))
+                      (stay-in-field self.pos self.vel)
+                      )
+                    )
+      )
     
     ; Always add a closure to fns-draw. Return what post-draw returned,
     ; or 0 if nil. This is used for counting the sheep.
@@ -302,9 +361,15 @@
                     (set self.pos (xy+ self.pos self.vel))
                     (spr (alternate self.sprite self.id)
                          self.pos.x self.pos.y
-                         bg-colour 1 self.flip)
+                         bg-colour 1 self.flip
+                         )
                     (if (~= nil post-draw)
-                      (post-draw self callback))))))
+                      (post-draw self callback)
+                      )
+                    )
+                  )
+    )
+  )
 
 ; Call this to create a new player dog at the center of the screen.
 (local new-player (entity-template
@@ -314,15 +379,19 @@
                      (set self.spr-run 272)
                      (set self.spr-idle 274)
                      (set self.scariness 50)
-                     (tset scary-ids self.id 1))
+                     (tset scary-ids self.id 1)
+                     )
                    ; update -> action
                    (fn update [self]
                      (var (action scared) (move-away-from-all self.pos self.id))
                      (xy+
                       (get-action (center self.pos) self.accel)
-                      (normalise action .5)))
+                      (normalise action .5)
+                      )
+                     )
                    ; post-draw
-                   nil))
+                   nil
+                   ))
 
 ; Call this to create a new stray dog moving automatically.
 ; It runs towards the mean of a target moving in a Lissajous curve,
@@ -334,18 +403,24 @@
                     (set self.spr-run 272)
                     (set self.spr-idle 274)
                     (set self.scariness 50)
-                    (tset scary-ids self.id 1))
+                    (tset scary-ids self.id 1)
+                    )
                   ; update -> action
                   (fn update [self herd-center]
                     (local target (xy (+ center-x (* center-x (math.cos (/ t 80))))
-                                      (+ center-y (* center-y (math.sin (/ t 70))))))
+                                      (+ center-y (* center-y (math.sin (/ t 70))))
+                                      )
+                           )
                     (var (action scared) (move-away-from-all self.pos self.id))
                     (xy+
                      (normalise (xy+ (xy- target self.pos)
                                      (xy- herd-center self.pos)) .2)
-                     (normalise action .5)))
+                     (normalise action .5)
+                     )
+                    )
                   ; post-draw
-                  nil))
+                  nil
+                  ))
 
 ; Call this to create a new sheep at a random location.
 (local new-sheep (entity-template
@@ -353,17 +428,22 @@
                   (fn init [self]
                     (set self.pos (find-random-space))
                     (set self.spr-run 256)
-                    (set self.spr-idle 258))
+                    (set self.spr-idle 258)
+                    )
                   ; update -> action
                   (fn update [self herd-center]
                     (var (action scared) (move-away-from-all self.pos self.id))
                     ; If moving away from player, head towards the center of the herd.
                     (when scared
-                      (set action (xy+ action (normalise (xy- herd-center self.pos) 1))))
-                    (normalise action self.accel))
+                      (set action (xy+ action (normalise (xy- herd-center self.pos) 1)))
+                      )
+                    (normalise action self.accel)
+                    )
                   ; post-draw
                   (fn post-draw [self callback]
-                    (callback self.pos))))
+                    (callback self.pos)
+                    )
+                  ))
 
 (fn decorate-map []
   "Add some flowers to empty space on the map."
@@ -373,7 +453,9 @@
   (for [i 0 20]
     (local x (random0 30))
     (local y (random0 17))
-    (when (= 0 (mget x y)) (mset x y (pick-random decorations)))))
+    (when (= 0 (mget x y)) (mset x y (pick-random decorations)))
+    )
+  )
 
 (fn play-level [is-in-play?]
   "The main game loop, called from the game coroutine.
@@ -407,72 +489,97 @@
           (draw (fn [pos]
                   (set herd-center (xy+ herd-center pos))
                   (++ sheep-count) ; zzz
-                  (when (is-in-play? pos) (set finished false)))))
+                  (when (is-in-play? pos) (set finished false))
+                  )
+                )
+          )
     (set herd-center (xy/ herd-center sheep-count))
     
-    (++ t)))
+    (++ t)
+    )
+  )
 
 (fn button-pressed? []
   "Return true if any mouse or controller button is pressed."
   ; todo: like btnp for mouse click
   (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
-  (or left middle right (btnp 4) (btnp 5) (btnp 6) (btnp 7)))
+  (or left middle right (btnp 4) (btnp 5) (btnp 6) (btnp 7))
+  )
 
 (fn print-border [text x y scale]
   "Like print but yellow with a black border."
   (each [_ offset (ipairs [(xy 0 1)
                            (xy 0 -1)
                            (xy 1 0)
-                           (xy -1 0)])]
-        (print text (+ x offset.x) (+ y offset.y) 0 false (if scale scale 1)))
-  (print text x y 2 false (if scale scale 1)))
+                           (xy -1 0)]
+                          )]
+        (print text (+ x offset.x) (+ y offset.y) 0 false (if scale scale 1))
+        )
+  (print text x y 2 false (if scale scale 1))
+  )
 
 (fn title []
+  "Level for the title screen with a stray dog."
   (table.insert fns-draw (fn [callback]
-                           (map)))
+                           (map)
+                           ))
   (new-stray)
   (for [_ 1 12] (new-sheep))
   (table.insert fns-draw (fn [callback]
                            (print-border "One Man and His Dog" 16 16 2)
-                           (print-border "Press X or click to start..." 16 40)))
+                           (print-border "Press X or click to start..." 16 40)
+                           ))
   ; Return false when we want to go to the next level.
-  (fn [] (not (button-pressed?))))
+  (fn [] (not (button-pressed?)))
+  )
+
+(fn clear []
+  "A dummy level to clear the screen."
+  (cls 6) ; todo: something prettier
+  (fn [] false)
+  )
 
 (fn say [message]
   "Return a closure which creates a level that just displays a message."
   (fn []
     (local text (.. message "\n\nPress X or click to continue..."))
     (table.insert fns-draw (fn [callback]
-                             (cls 12) ; todo: avoid cls
                              (print-border text 16 16)
-                             (callback (xy 0 0))))
+                             (callback (xy 0 0))
+                             ))
     ; Return false when we want to go to the next level.
-    (fn [] (not (button-pressed?)))))
+    (fn [] (not (button-pressed?)))
+    )
+  )
 
 (fn outside? [pos center radius]
   "Return true if the sprite at pos is outside the circle defined by center and radius."
   ; todo: check this is right
   (local dx (- pos.x center.x -4))
   (local dy (- pos.y center.y -4))
-  (> (+ (* dx dx) (* dy dy)) (* radius radius)))
+  (> (+ (* dx dx) (* dy dy)) (* radius radius))
+  )
 
 (fn level1 []
   (local c (xy center-x center-y))
   (local r (/ center-y 2))
   (table.insert fns-draw (fn []
                            (map)
-                           (circb c.x c.y r 15)))
+                           (circb c.x c.y r 15)
+                           ))
   (new-player)
   (for [_ 1 12] (new-sheep))
   ; Return false when this sheep is in the finish area.
   (fn [pos]
-    (outside? pos c r)))
+    (outside? pos c r)
+    )
+  )
 
 (fn game []
   "Coroutine to step through levels and run the main game loop."
   
   (local levels [
-                 title
+                 title clear
                  (say "Level 1\n\nHerd the sheep into the circle.") level1
                  (say "Well done!\n\nWould you like to play again?")
                  ])
@@ -483,7 +590,10 @@
           ; Call the level's closure to initialise and return a closure,
           ; which will be called for each sheep to check if the level is finished.
           (play-level (level))
-          (tidy-up))))
+          (tidy-up)
+          )
+    )
+  )
 
 ; Create a coroutine from the game function and resume it on each frame.
 ; It needs an initial resume call to get things started.
