@@ -1,6 +1,6 @@
 ;; title:  One Man And His Dog
 ;; author: Stephen Wassell
-;; desc:   Art by u/please_send_cookies
+;; desc:   Art by @valeriobulla
 ;; script: fennel
 
 ; Constants and globals.
@@ -32,7 +32,7 @@
 ; Some utility functions.
 
 (fn tidy-up []
-  "Initialise globals at the start of a new level."
+  "Initialise globals at the start of a new scene."
   (set scary-ids {})
   (set fns-move-away {})
   (set fns-update [])
@@ -457,7 +457,7 @@
     )
   )
 
-(fn play-level [is-in-play?]
+(fn play-scene [is-in-play?]
   "The main game loop, called from the game coroutine.
   On each frame call all updaters then all drawers.
   When a sheep is drawn it adds its coords to herd-center, which we divide
@@ -483,7 +483,7 @@
     (set finished true)
     
     ; Call all drawers. For each sheep, add their coords to herd-center,
-    ; and call the closure returned by the level to check if they
+    ; and call the closure returned by the scene to check if they
     ; are still in play (true) or in the finish area (false).
     (each [_ draw (ipairs fns-draw)]
           (draw (fn [pos]
@@ -519,7 +519,7 @@
   )
 
 (fn title []
-  "Level for the title screen with a stray dog."
+  "Scene for the title screen with sheep and a stray dog."
   (table.insert fns-draw (fn [callback]
                            (map)
                            ))
@@ -529,25 +529,25 @@
                            (print-border "One Man and His Dog" 16 16 2)
                            (print-border "Press X or click to start..." 16 40)
                            ))
-  ; Return false when we want to go to the next level.
+  ; Return false when we want to go to the next scene.
   (fn [] (not (button-pressed?)))
   )
 
 (fn clear []
-  "A dummy level to clear the screen."
+  "A dummy scene to clear the screen."
   (cls 6) ; todo: something prettier
   (fn [] false)
   )
 
 (fn say [message]
-  "Return a closure which creates a level that just displays a message."
+  "Return a closure which creates a scene that just displays a message."
   (fn []
     (local text (.. message "\n\nPress X or click to continue..."))
     (table.insert fns-draw (fn [callback]
                              (print-border text 16 16)
                              (callback (xy 0 0))
                              ))
-    ; Return false when we want to go to the next level.
+    ; Return false when we want to go to the next scene.
     (fn [] (not (button-pressed?)))
     )
   )
@@ -576,9 +576,9 @@
   )
 
 (fn game []
-  "Coroutine to step through levels and run the main game loop."
+  "Coroutine to step through scenes and run the main game loop."
   
-  (local levels [
+  (local scenes [
                  title clear
                  (say "Level 1\n\nHerd the sheep into the circle.") level1
                  (say "Well done!\n\nWould you like to play again?")
@@ -586,10 +586,10 @@
   
   (decorate-map)
   (while true
-    (each [_ level (ipairs levels)]
-          ; Call the level's closure to initialise and return a closure,
-          ; which will be called for each sheep to check if the level is finished.
-          (play-level (level))
+    (each [_ scene (ipairs scenes)]
+          ; Call the scene's closure to initialise and return a closure,
+          ; which will be called for each sheep to check if the scene is finished.
+          (play-scene (scene))
           (tidy-up)
           )
     )
