@@ -1,6 +1,6 @@
 ;; title:  One Man And His Dog
-;; author: Stephen Wassell
-;; desc:   Art by @valeriobulla
+;; author: Code by Stephen Wassell, art by @valeriobulla
+;; desc:   Tiny sheepdog trials
 ;; script: fennel
 
 ; Constants and globals.
@@ -21,13 +21,15 @@
 ; Incremented on each frame.
 (var t 0)
 
+; Arrays of closures. Update and draw are called on each frame.
+(var fns-update []) ; (fn []) -> action vector
+(var fns-draw []) ; (fn [callback])
+
 ; Set of ids of things that scare the sheep - eg player.
 (var scary-ids {})
 
-; Tables of entity id => closure. All entries in update and draw are called on each frame.
+; Table of entity id => closure.
 (var fns-move-away {}) ; id (fn [from]) -> vector to move away from 'from'
-(var fns-update []) ; (fn []) -> action vector
-(var fns-draw []) ; (fn [callback])
 
 ; Some utility functions.
 
@@ -513,7 +515,7 @@
                            (xy 1 0)
                            (xy -1 0)]
                           )]
-        (print text (+ x offset.x) (+ y offset.y) 0 false (if scale scale 1))
+        (print text (+ x offset.x) (+ y offset.y) 14 false (if scale scale 1))
         )
   (print text x y 2 false (if scale scale 1))
   )
@@ -527,7 +529,7 @@
   (for [_ 1 12] (new-sheep))
   (table.insert fns-draw (fn [callback]
                            (print-border "One Man and His Dog" 16 16 2)
-                           (print-border "Press X or click to start..." 16 40)
+                           (print-border "Tiny Sheepdog Trials!\n\n\nArt by @valeriobulla\n\nCode by Stephen Wassell\n\n\nPress X or click to start..." 16 40)
                            ))
   ; Return false when we want to go to the next scene.
   (fn [] (not (button-pressed?)))
