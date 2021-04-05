@@ -541,10 +541,10 @@
   (fn [] false)
   )
 
-(fn say [message]
+(fn say [line1 line2]
   "Return a closure which creates a scene that just displays a message."
   (fn []
-    (local text (.. message "\n\nPress X or click to continue..."))
+    (local text (.. line1 "\n\n" line2 "\n\nPress X or click to continue..."))
     (table.insert fns-draw (fn [callback]
                              (print-border text 16 16)
                              (callback (xy 0 0))
@@ -580,10 +580,13 @@
 (fn game []
   "Coroutine to step through scenes and run the main game loop."
   
+  (var n 0)
+  (fn level-n [] (.. "Level " (++ n)))
+  
   (local scenes [
                  title clear
-                 (say "Level 1\n\nHerd the sheep into the circle.") level1
-                 (say "Well done!\n\nWould you like to play again?")
+                 (say (level-n) "Herd the sheep into the circle.") level1
+                 (say "Well done!" "Would you like to play again?")
                  ])
   
   (decorate-map)
@@ -594,6 +597,7 @@
           (play-scene (scene))
           (tidy-up)
           )
+    (set n 0)
     )
   )
 
