@@ -26,6 +26,11 @@ brown
 122 68 74               7a444a  13
 #94 54 67                5f3643
 
+dog
+80 87 107               50576b
+black 46 55 64
+16 30 41                101e29
+
 14 free
 
 2e3740fbfcaaffce00f4b41bb6d53c71aa343f7e0092f4ff42cafd3978a8bcb7c58d87a2bf79587a444a666666f8f8f8
