@@ -154,16 +154,8 @@
    )
   )
 
-(fn to-mouse [from]
-  "Return vector from x y to mouse, if any buttons pressed (else 0 0)."
-  (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
-  (if (or left middle right) (xy (- mouse-x from.x) (- mouse-y from.y))
-    (xy 0 0)
-    )
-  )
-
 (fn get-action [from accel]
-  "Return direction to move player based on buttons and mouse, normalised to magnitude accel."
+  "Return direction to move player based on buttons, normalised to magnitude accel."
   (let [dir (match (buttons)
                    ; up down left right
                    (1 0 0 0) (xy 0 -1)
@@ -174,7 +166,7 @@
                    (1 0 0 1) (xy 1 -1)
                    (0 1 1 0) (xy -1 1)
                    (0 1 0 1) (xy 1 1)
-                   _ (to-mouse from) ; No buttons pressed, go towards mouse.
+                   _ (xy 0 0)
                    )]
     (normalise dir accel)
     )
@@ -502,10 +494,8 @@
   )
 
 (fn button-pressed? []
-  "Return true if any mouse or controller button is pressed."
-  ; todo: like btnp for mouse click
-  (local (mouse-x mouse-y left middle right scrollx scrolly) (mouse))
-  (or left middle right (btnp 4) (btnp 5) (btnp 6) (btnp 7))
+  "Return true if any controller button is pressed."
+  (or (btnp 4) (btnp 5) (btnp 6) (btnp 7))
   )
 
 (fn print-border [text x y scale]
@@ -529,7 +519,7 @@
   (for [_ 1 12] (new-sheep))
   (table.insert fns-draw (fn [callback]
                            (print-border "One Man and His Dog" 16 16 2)
-                           (print-border "Tiny Sheepdog Trials!\n\n\nArt by @valeriobulla\n\nCode by Stephen Wassell\n\n\nPress X or click to start..." 16 40)
+                           (print-border "Tiny Sheepdog Trials!\n\n\nArt by @valeriobulla\n\nCode by Stephen Wassell\n\n\nPress X to start..." 16 40)
                            ))
   ; Return false when we want to go to the next scene.
   (fn [] (not (button-pressed?)))
@@ -544,7 +534,7 @@
 (fn say [line1 line2]
   "Return a closure which creates a scene that just displays a message."
   (fn []
-    (local text (.. line1 "\n\n" line2 "\n\nPress X or click to continue..."))
+    (local text (.. line1 "\n\n" line2 "\n\nPress X to continue..."))
     (table.insert fns-draw (fn [callback]
                              (print-border text 16 16)
                              (callback (xy 0 0))
