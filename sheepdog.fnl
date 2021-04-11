@@ -520,7 +520,11 @@
   (for [_ 1 12] (new-sheep))
   (table.insert fns-draw (fn [callback]
                            (print-border "One Man and His Dog" 16 16 2)
-                           (print-border "Tiny Sheepdog Trials!\n\n\nArt by @valeriobulla\n\nCode by Stephen Wassell\n\n\nMusic by Tom Clough\n\n\nPress X to start..." 16 40)
+                           (print-border "Tiny Sheepdog Trials!
+\n\nArt by @valeriobulla
+\nCode by Stephen Wassell
+\nMusic by Tom Clough
+\n\nPress X to start..." 16 40)
                            ))
   ; Return false when we want to go to the next scene.
   (fn [] (not (button-pressed?)))
