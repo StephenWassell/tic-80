@@ -570,7 +570,7 @@
   ; todo: check this is right
   (local dx (- pos.x center.x -4))
   (local dy (- pos.y center.y -4))
-  (> (+ (* dx dx) (* dy dy)) (^ (- radius 4) 2))
+  (> (+ (* dx dx) (* dy dy)) (^ (- radius 2) 2))
   )
 
 (fn level1 []
