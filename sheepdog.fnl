@@ -451,6 +451,19 @@
     )
   )
 
+(fn cover-when [pred]
+  "Draw every dot on the screen where (pred pos) is true."
+  (for [y 0 screen-h]
+    (for [x 0 screen-w]
+      (when (and
+             (= 0 (% (+ x y) 2))
+             (pred (xy x y))
+             )
+             (pix x y 1))
+      )
+    )
+  )
+
 (fn play-scene [is-in-play?]
   "The main game loop, called from the game coroutine.
   On each frame call all updaters then all drawers.
@@ -488,6 +501,9 @@
                 )
           )
     (set herd-center (xy/ herd-center sheep-count))
+    
+    ; Press D to debug.
+    (when (key 4) (cover-when is-in-play?))
     
     (++ t)
     )
