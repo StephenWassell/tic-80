@@ -457,7 +457,7 @@
     (for [x 0 screen-w]
       (when (and
              (= 0 (% (+ x y) 2))
-             (pred (xy x y))
+             (pred (xy (- x 4) (- y 4)))
              )
              (pix x y 1))
       )
@@ -570,7 +570,7 @@
   ; todo: check this is right
   (local dx (- pos.x center.x -4))
   (local dy (- pos.y center.y -4))
-  (> (+ (* dx dx) (* dy dy)) (* radius radius))
+  (> (+ (* dx dx) (* dy dy)) (^ (- radius 4) 2))
   )
 
 (fn level1 []
