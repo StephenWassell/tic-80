@@ -451,15 +451,13 @@
     )
   )
 
-(fn cover-when [pred]
+(fn cover-when [pred col]
   "Draw every dot on the screen where (pred pos) is true."
   (for [y 0 screen-h]
-    (for [x 0 screen-w]
-      (when (and
-             (= 0 (% (+ x y) 2))
-             (pred (xy (- x 4) (- y 4)))
-             )
-             (pix x y 1))
+    (for [x (% y 2) screen-w 2]
+      (when (pred (xy (- x 4) (- y 4)))
+        (pix x y col)
+        )
       )
     )
   )
@@ -503,7 +501,7 @@
     (set herd-center (xy/ herd-center sheep-count))
     
     ; Press D to debug.
-    (when (key 4) (cover-when is-in-play?))
+    (when (key 4) (cover-when is-in-play? 1))
     
     (++ t)
     )
@@ -549,6 +547,7 @@
 (fn clear []
   "A dummy scene to clear the screen."
   (cls 6) ; todo: something prettier
+  (cover-when (fn [] true) 5)
   (fn [] false)
   )
 
